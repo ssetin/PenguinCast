@@ -1,0 +1,13 @@
+{
+    "Name": "Rollstation radio",
+	"Admin": "admin@penguin.com",
+    "Location": "Saint Petersburg",
+    "Host": "http://127.0.0.1",
+	"Socket": { "Port": 8008},
+    "Limits": {"Clients": 30, "Sources": 5},
+    "Auth": {"AdminPassword": "admin"},
+    "Paths": {"Log": "log/", "Web":"html/"},
+    "Logging": {"Loglevel": 2, "Logsize": 50000},
+    "Mounts": [{"Name": "RockRadio96", "Password": "admin", "Genre":"Rock", "Description": "Rock radio station, Saint Petersburg", "BitRate":96},
+        {"Name": "JazzMe", "Password": "admin",  "Genre":"Jazz", "Description": "Indie jazz radio station, Online cast", "BitRate":128}]
+}

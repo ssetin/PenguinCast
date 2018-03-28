@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+  <head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />	
+	<link rel="stylesheet" type="text/css" href="/style.css" />    
+	<title>PenguinCast</title>
+  </head>
+  <body>
+	<div>
+	    <img src="/img/penguin.png" class="left"/>
+		<h1 class="left mainheader">PenguinCast</h1>
+	</div><div class="clear"></div>
+		<div>
+			{{range .}}
+			<table class="greyGridTable">
+				<tr>
+					<th><h3>{{.Name}}</h3></th>
+					<th></th>
+				</tr>
+				<tr>
+					<td>Status:</td>
+					<td>{{.Status.Status}}</td>
+				</tr>
+				<tr>
+					<td>Stream Description:</td>
+					<td>{{.Description}}</td>
+				</tr>
+				<tr>
+					<td>Genre:</td>
+					<td>{{.Genre}}</td>
+				</tr>				
+				<tr>
+					<td>Content Type:</td>
+					<td>{{.ContentType}}</td>
+				</tr>
+				<tr>
+					<td>Bitrate:</td>
+					<td>{{.BitRate}}</td>
+				</tr>
+				<tr>
+					<td>Listeners (current):</td>
+					<td>{{.Status.Listeners}}</td>
+				</tr>
+				<tr>
+					<td>Stream URL:</td>
+					<td><a href="{{.StreamURL}}">/{{.Name}}</a></td>
+				</tr>
+				<tr>
+					<td>Currently playing:</td>
+					<td>{{.Status.SongTitle}}</td>
+				</tr>
+			</table>
+			{{end}}
+		</div>
+	</div>
+	<div id="footer">
+		No support, just take fun with radio<br/>
+		* inspired by the icecast project
+	</div>
+	</body>
+</html>
