@@ -2,7 +2,8 @@
 <html>
   <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />	
-	<link rel="stylesheet" type="text/css" href="/style.css" />    
+	<link rel="stylesheet" type="text/css" href="/style.css" />
+	<link rel="shortcut icon" href="/favicon.ico" />
 	<title>PenguinCast</title>
   </head>
   <body>
@@ -21,6 +22,10 @@
 					<td>Status:</td>
 					<td>{{.Status.Status}}</td>
 				</tr>
+				<tr>
+					<td>Started:</td>
+					<td>{{.Status.Started}}</td>
+				</tr>				
 				<tr>
 					<td>Stream Description:</td>
 					<td>{{.Description}}</td>
@@ -43,7 +48,7 @@
 				</tr>
 				<tr>
 					<td>Stream URL:</td>
-					<td><a href="{{.StreamURL}}">/{{.Name}}</a></td>
+					<td><a href="{{.StreamURL}}">{{.StreamURL}}</a></td>
 				</tr>
 				<tr>
 					<td>Currently playing:</td>

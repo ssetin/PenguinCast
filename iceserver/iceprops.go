@@ -3,11 +3,13 @@ package icyserver
 import (
 	"encoding/json"
 	"io/ioutil"
+	"strconv"
 )
 
 // Mount ...
 type Mount struct {
 	Name        string
+	User        string
 	Password    string
 	Description string
 	BitRate     int
@@ -17,12 +19,15 @@ type Mount struct {
 
 	Status struct {
 		Status    string
+		Started   string
 		SongTitle string
 		Listeners int
 	}
 
-	MetaInt int
-	buffer  []byte
+	Server     *IcyServer
+	MetaInt    int
+	BufferSize int
+	buffer     []byte
 }
 
 // Properties ...
@@ -76,10 +81,21 @@ func (i *IcyServer) initConfig() error {
 }
 
 //Init ...
-func (m *Mount) Init(urlprefix string, buflen int, metaint int) error {
-	m.Status.Status = "Offline"
-	m.StreamURL = urlprefix + "/" + m.Name
-	m.MetaInt = metaint
-	m.buffer = make([]byte, buflen)
+func (m *Mount) Init(srv *IcyServer) error {
+	m.Server = srv
+	m.Clear()
+	m.MetaInt = 256000
+	m.BufferSize = m.BitRate * 1024 / 8 * 100
+	m.buffer = make([]byte, m.BufferSize)
 	return nil
+}
+
+//Clear ...
+func (m *Mount) Clear() {
+	m.Status.Status = "Offline"
+	m.Status.Started = ""
+	m.Status.Listeners = 0
+	m.Status.SongTitle = ""
+	//m.BitRate = 0
+	m.StreamURL = m.Server.Props.Host + ":" + strconv.Itoa(m.Server.Props.Socket.Port)
 }

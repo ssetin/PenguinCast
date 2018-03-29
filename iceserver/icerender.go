@@ -23,7 +23,6 @@ func (i *IcyServer) setInternal(w http.ResponseWriter, r *http.Request) {
 
 func (i *IcyServer) renderMounts(w http.ResponseWriter, r *http.Request, tplname string) {
 	t, err := template.ParseFiles(tplname)
-	i.printError(2, "renderMounts "+tplname)
 	if err != nil {
 		i.printError(1, err.Error())
 		i.setInternal(w, r)
@@ -32,6 +31,7 @@ func (i *IcyServer) renderMounts(w http.ResponseWriter, r *http.Request, tplname
 	err = t.Execute(w, &i.Props.Mounts)
 	if err != nil {
 		i.printError(1, err.Error())
+		i.setInternal(w, r)
 		return
 	}
 }

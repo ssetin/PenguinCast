@@ -15,7 +15,7 @@ var (
 	strICYCaps  = "icy-caps:11\r\n\r\n"
 	strICYNote2 = "icy-notice2:%s/%s\r\n"
 	strICYName  = "icy-name:%s\r\n"
-	strICYPub   = "icy-pub:1\r\n"
+	strICYPub   = "icy-pub:0\r\n"
 	strICYMeta  = "icy-metaint:%d\r\n"
 	strICYEol   = "\r\n"
 )
@@ -56,20 +56,27 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if m.Password != pair[1] {
+	if m.Password != pair[1] && m.User != pair[0] {
 		http.Error(w, "Not authorized", 401)
 		return err
 	}
 
-	fmt.Fprint(w, strICYOk2)
-	fmt.Fprint(w, strICYCaps)
+	w.Header().Set("Server", m.Server.serverName+"/"+m.Server.version)
+	w.Header().Set("Connection", "Keep-Alive")
+	w.Header().Set("Allow", "GET, SOURCE")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Transfer-Encoding", "chunked")
+	w.WriteHeader(http.StatusOK)
 
-	fmt.Println("Auth Ok!")
+	flusher, _ := w.(http.Flusher)
+	flusher.Flush()
 
 	return nil
 }
 
-func (m *Mount) readHeaders(w http.ResponseWriter, r *http.Request) {
+func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
 	brate, err := strconv.Atoi(r.Header.Get("ice-bitrate"))
 	if err != nil {
 		m.BitRate = 0
@@ -78,22 +85,26 @@ func (m *Mount) readHeaders(w http.ResponseWriter, r *http.Request) {
 	}
 	m.Genre = r.Header.Get("ice-genre")
 	m.ContentType = r.Header.Get("content-type")
+	m.StreamURL = r.Header.Get("ice-url")
 	m.Description = r.Header.Get("ice-description")
 }
 
 //IcyServer*******************************************************************************************
 
 //223.33.152.54 - - [27/Feb/2012:13:37:21 +0300] "GET /gop_aac HTTP/1.1" 200 75638 "-" "WMPlayer/10.0.0.364 guid/3300AD50-2C39-46C0-AE0A-AC7B8159E203" 400
-func (i *IcyServer) closeMount(idx int, bytessended *int, start time.Time, r *http.Request) {
-	i.Props.Mounts[idx].Status.Listeners--
+func (i *IcyServer) closeMount(idx int, issource bool, bytessended *int, start time.Time, r *http.Request) {
+	if issource {
+		i.Props.Mounts[idx].Clear()
+	} else {
+		i.Props.Mounts[idx].Status.Listeners--
+	}
 	t := time.Now()
 	elapsed := t.Sub(start)
 	i.printAccess("%s - - [%s] \"%s\" %s %d \"%s\" \"%s\" %d\r\n", getHost(r.RemoteAddr), start.Format(time.RFC1123Z), r.Method+" "+r.RequestURI+" "+r.Proto, "200", *bytessended, r.Referer(), r.UserAgent(), int(elapsed.Seconds()))
 }
 
-func (i *IcyServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
-	var request string
-	// Temporary
+func (i *IcyServer) logHeaders(w http.ResponseWriter, r *http.Request) {
+	request := r.Method + " " + r.RequestURI + " " + r.Proto + "\n"
 	for name, headers := range r.Header {
 		name = strings.ToLower(name)
 		for _, h := range headers {
@@ -101,8 +112,13 @@ func (i *IcyServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	i.printError(2, "\n"+request)
+}
 
-	if r.Header.Get("ice-name") > "" {
+func (i *IcyServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
+	// Temporary
+	i.logHeaders(w, r)
+
+	if r.Method == "SOURCE" {
 		i.writeMount(idx, w, r)
 	} else {
 		i.readMount(idx, w, r)
@@ -111,74 +127,69 @@ func (i *IcyServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 }
 
 func (i *IcyServer) readMount(idx int, w http.ResponseWriter, r *http.Request) {
-	bufferSize := 65536
 	bytessended := 0
+	readbuffer := i.Props.Mounts[idx].BufferSize
 	start := time.Now()
 
 	i.printError(2, "readMount "+i.Props.Mounts[idx].Name)
 	i.Props.Mounts[idx].Status.Listeners++
-	defer i.closeMount(idx, &bytessended, start, r)
+	defer i.closeMount(idx, false, &bytessended, start, r)
 
-	fmt.Fprint(w, strICYOk)
-	fmt.Fprintf(w, strICYNote2, i.serverName, i.version)
-	fmt.Fprintf(w, strICYName, i.Props.Name)
-	fmt.Fprint(w, strICYPub)
-	fmt.Fprintf(w, strICYMeta, i.Props.Mounts[idx].MetaInt)
-	fmt.Fprint(w, strICYEol)
+	w.Header().Set("Server", i.serverName+" "+i.version)
+	w.Header().Set("Content-Type", i.Props.Mounts[idx].ContentType)
+	w.Header().Set("x-audiocast-name", i.Props.Mounts[idx].Name)
+	w.Header().Set("x-audiocast-genre", i.Props.Mounts[idx].Genre)
+	w.Header().Set("x-audiocast-url", i.Props.Mounts[idx].StreamURL)
+	w.Header().Set("x-audiocast-public", "0")
+	w.Header().Set("x-audiocast-bitrate", strconv.Itoa(i.Props.Mounts[idx].BitRate))
+	w.Header().Set("x-audiocast-description", i.Props.Mounts[idx].Description)
 
-	mp3, err := i.loadPage("D:\\Sergey\\Misic\\the_stranglers_-_golden_brownsnatch-ost.mp3")
-	if err != nil {
-		i.printError(1, err.Error())
-		return
-	}
+	w.WriteHeader(http.StatusOK)
+	//defer r.Body.Close()
 
-	for pos := 0; pos < len(mp3)-bufferSize; pos += bufferSize {
-		buffer := mp3[pos : pos+bufferSize]
+	for pos := 0; pos <= i.Props.Mounts[idx].BufferSize-readbuffer; pos += readbuffer {
+		buffer := i.Props.Mounts[idx].buffer[pos : pos+readbuffer]
 		s, err := w.Write(buffer)
+
 		if err != nil {
 			i.printError(1, err.Error())
 			break
 		}
 		bytessended += s
+
+		//flusher, _ := w.(http.Flusher)
+		//flusher.Flush()
 		time.Sleep(1 * time.Second)
 	}
-
-	/*for {
-		//buffer := mp3[pos : pos+bufferSize]
-		s, err := w.Write(i.Props.Mounts[idx].buffer)
-		if err != nil {
-			i.printError(1, err.Error())
-			break
-		}
-		bytessended += s
-		time.Sleep(1 * time.Second)
-	}*/
-
+	i.printError(2, "readMount bytessended="+strconv.Itoa(bytessended))
 }
 
 func (i *IcyServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) {
-	err := i.Props.Mounts[idx].auth(w, r)
-	if err != nil {
-		i.printError(1, err.Error())
-		return
+	if i.Props.Mounts[idx].Status.Status != "On air" {
+		err := i.Props.Mounts[idx].auth(w, r)
+		if err != nil {
+			i.printError(1, err.Error())
+			return
+		}
+		i.Props.Mounts[idx].writeICEHeaders(w, r)
+		i.Props.Mounts[idx].Status.Status = "On air"
+		i.Props.Mounts[idx].Status.Started = time.Now().Format(time.RFC1123Z)
 	}
-	i.Props.Mounts[idx].readHeaders(w, r)
-	i.Props.Mounts[idx].Status.Status = "On air"
 
-	bufferSize := 65536
-	var buffer []byte
-	buffer = make([]byte, bufferSize)
 	bytessended := 0
 	start := time.Now()
 
 	i.printError(2, "writeMount "+i.Props.Mounts[idx].Name)
-	defer i.closeMount(idx, &bytessended, start, r)
-	defer r.Body.Close()
+	defer i.closeMount(idx, true, &bytessended, start, r)
+	//defer r.Body.Close()
 
 	for {
-		r.Body.Read(buffer)
-		i.Props.Mounts[idx].writeBuffer(buffer, bufferSize)
-		time.Sleep(1 * time.Second)
-	}
+		readed, _ := r.Body.Read(i.Props.Mounts[idx].buffer)
 
+		bytessended += readed
+		//time.Sleep(1 * time.Second)
+		//flusher, _ := w.(http.Flusher)
+		//flusher.Flush()
+	}
+	i.printError(2, "writeMount bytessended="+strconv.Itoa(bytessended))
 }

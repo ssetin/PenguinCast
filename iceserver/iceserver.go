@@ -11,7 +11,7 @@ import (
 
 const (
 	cServerName = "PenguinCast"
-	cVersion    = "0.01c"
+	cVersion    = "0.01d"
 )
 
 // IcyServer ...
@@ -50,7 +50,7 @@ func (i *IcyServer) Init() error {
 
 func (i *IcyServer) initMounts() {
 	for idx := range i.Props.Mounts {
-		i.Props.Mounts[idx].Init(i.Props.Host+":"+strconv.Itoa(i.Props.Socket.Port), 65536, 262144)
+		i.Props.Mounts[idx].Init(i)
 	}
 }
 
@@ -80,6 +80,7 @@ func (i *IcyServer) handler(w http.ResponseWriter, r *http.Request) {
 
 	if mountidx >= 0 {
 		i.openMount(mountidx, w, r)
+		return
 	}
 
 	if strings.HasSuffix(page, "info.html") || strings.HasSuffix(page, "info.json") {
