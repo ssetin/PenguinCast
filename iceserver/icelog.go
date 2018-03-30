@@ -1,4 +1,4 @@
-package icyserver
+package iceserver
 
 import (
 	"log"
@@ -7,10 +7,10 @@ import (
 
 /*
 	Log Level
-	1 - Errors; 2 - Debug
+	1 - Errors; 2 - Warning; 3 - Info; 4 - Debug
 */
 
-func (i *IcyServer) initLog() error {
+func (i *IceServer) initLog() error {
 	var err error
 	i.logErrorFile, err = os.OpenFile(i.Props.Paths.Log+"error.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
@@ -28,18 +28,22 @@ func (i *IcyServer) initLog() error {
 	return nil
 }
 
-func (i *IcyServer) printError(errorlevel int, format string, v ...interface{}) {
+func (i *IceServer) printError(errorlevel int, format string, v ...interface{}) {
 	if errorlevel <= i.Props.Logging.Loglevel {
 		var mark string
 		if errorlevel == 1 {
 			mark = "Error: "
-		} else {
+		} else if errorlevel == 2 {
+			mark = "Warn: "
+		} else if errorlevel == 3 {
+			mark = "Info: "
+		} else if errorlevel == 4 {
 			mark = "Debug: "
 		}
 		i.logError.Printf(mark+format, v...)
 	}
 }
 
-func (i *IcyServer) printAccess(format string, v ...interface{}) {
+func (i *IceServer) printAccess(format string, v ...interface{}) {
 	i.logAccess.Printf(format, v...)
 }

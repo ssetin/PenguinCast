@@ -1,4 +1,4 @@
-package icyserver
+package iceserver
 
 import (
 	"errors"
@@ -9,19 +9,19 @@ import (
 	"path/filepath"
 )
 
-func (i *IcyServer) setNotFound(w http.ResponseWriter, r *http.Request) {
+func (i *IceServer) setNotFound(w http.ResponseWriter, r *http.Request) {
 	f, _ := i.loadPage(i.Props.Paths.Web + "404.html")
 	w.WriteHeader(404)
 	w.Write(f)
 }
 
-func (i *IcyServer) setInternal(w http.ResponseWriter, r *http.Request) {
+func (i *IceServer) setInternal(w http.ResponseWriter, r *http.Request) {
 	f, _ := i.loadPage(i.Props.Paths.Web + "500.html")
 	w.WriteHeader(500)
 	w.Write(f)
 }
 
-func (i *IcyServer) renderMounts(w http.ResponseWriter, r *http.Request, tplname string) {
+func (i *IceServer) renderMounts(w http.ResponseWriter, r *http.Request, tplname string) {
 	t, err := template.ParseFiles(tplname)
 	if err != nil {
 		i.printError(1, err.Error())
@@ -36,7 +36,7 @@ func (i *IcyServer) renderMounts(w http.ResponseWriter, r *http.Request, tplname
 	}
 }
 
-func (i *IcyServer) loadPage(filename string) ([]byte, error) {
+func (i *IceServer) loadPage(filename string) ([]byte, error) {
 	body, err := ioutil.ReadFile(filename)
 	if err != nil {
 		i.printError(1, err.Error())
@@ -45,7 +45,7 @@ func (i *IcyServer) loadPage(filename string) ([]byte, error) {
 	return body, nil
 }
 
-func (i *IcyServer) checkPage(w http.ResponseWriter, r *http.Request) (string, int, error) {
+func (i *IceServer) checkPage(w http.ResponseWriter, r *http.Request) (string, int, error) {
 	filename := filepath.Join(i.Props.Paths.Web, filepath.Clean(r.URL.Path))
 	mountidx := i.checkIsMount(filename)
 
