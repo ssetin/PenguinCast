@@ -49,7 +49,7 @@ func (i *IceServer) checkPage(w http.ResponseWriter, r *http.Request) (string, i
 	filename := filepath.Join(i.Props.Paths.Web, filepath.Clean(r.URL.Path))
 	mountidx := i.checkIsMount(filename)
 
-	i.printError(2, "checkPage filename="+filename)
+	i.printError(4, "checkPage filename="+filename)
 
 	if mountidx >= 0 {
 		return "", mountidx, nil

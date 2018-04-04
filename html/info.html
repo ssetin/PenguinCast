@@ -20,11 +20,11 @@
 				</tr>
 				<tr>
 					<td>Status:</td>
-					<td>{{.Status.Status}}</td>
+					<td>{{.State.Status}}</td>
 				</tr>
 				<tr>
 					<td>Started:</td>
-					<td>{{.Status.Started}}</td>
+					<td>{{.State.Started}}</td>
 				</tr>				
 				<tr>
 					<td>Stream Description:</td>
@@ -44,7 +44,7 @@
 				</tr>
 				<tr>
 					<td>Listeners (current):</td>
-					<td>{{.Status.Listeners}}</td>
+					<td>{{.State.Listeners}}</td>
 				</tr>
 				<tr>
 					<td>Stream URL:</td>
@@ -52,7 +52,7 @@
 				</tr>
 				<tr>
 					<td>Currently playing:</td>
-					<td>{{.Status.SongTitle}}</td>
+					<td>{{.State.MetaInfo.StreamTitle}}</td>
 				</tr>
 			</table>
 			{{end}}

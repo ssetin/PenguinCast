@@ -73,6 +73,10 @@ func (i *IceServer) checkIsMount(page string) int {
 }
 
 func (i *IceServer) handler(w http.ResponseWriter, r *http.Request) {
+	if i.Props.Logging.Loglevel == 4 {
+		i.logHeaders(w, r)
+	}
+
 	page, mountidx, err := i.checkPage(w, r)
 	if err != nil {
 		i.printError(1, err.Error())

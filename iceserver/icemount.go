@@ -1,12 +1,25 @@
 package iceserver
 
+/*
+	TODO:
+	- buffer queue
+	- meta info
+*/
+
 import (
 	"encoding/base64"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 )
+
+// MetaData ...
+type MetaData struct {
+	MetaInt     int
+	StreamTitle string
+}
 
 // Mount ...
 type Mount struct {
@@ -19,16 +32,15 @@ type Mount struct {
 	StreamURL   string
 	Genre       string
 
-	Status struct {
+	State struct {
 		Status    string
 		Started   string
-		SongTitle string
+		MetaInfo  MetaData
 		Listeners int
 	}
 
 	mux        sync.Mutex
 	Server     *IceServer
-	MetaInt    int
 	BufferSize int
 	buffer     []byte
 }
@@ -37,38 +49,39 @@ type Mount struct {
 func (m *Mount) Init(srv *IceServer) error {
 	m.Server = srv
 	m.Clear()
-	m.MetaInt = 256000
-	m.BufferSize = m.BitRate * 1024 / 8 * 2
-	m.buffer = make([]byte, m.BufferSize)
+	m.State.MetaInfo.MetaInt = 16384
+	m.BufferSize = m.BitRate * 1024 / 8
+	m.buffer = make([]byte, m.BufferSize+m.State.MetaInfo.MetaInt)
 	return nil
 }
 
 //Clear ...
 func (m *Mount) Clear() {
-	m.Status.Status = "Offline"
-	m.Status.Started = ""
+	m.State.Status = "Offline"
+	m.State.Started = ""
 	m.zeroListeners()
-	m.Status.SongTitle = ""
-	//m.BitRate = 0
-	m.StreamURL = m.Server.Props.Host + ":" + strconv.Itoa(m.Server.Props.Socket.Port)
+	m.State.MetaInfo.StreamTitle = ""
+	m.StreamURL = m.Server.Props.Host + ":" + strconv.Itoa(m.Server.Props.Socket.Port) + "/" + m.Name
 }
 
 func (m *Mount) incListeners() {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	m.Status.Listeners++
+	m.State.Listeners++
 }
 
 func (m *Mount) decListeners() {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	m.Status.Listeners--
+	if m.State.Listeners > 0 {
+		m.State.Listeners--
+	}
 }
 
 func (m *Mount) zeroListeners() {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	m.Status.Listeners = 0
+	m.State.Listeners = 0
 }
 
 func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
@@ -119,4 +132,22 @@ func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
 	m.ContentType = r.Header.Get("content-type")
 	m.StreamURL = r.Header.Get("ice-url")
 	m.Description = r.Header.Get("ice-description")
+}
+
+/* MetaData */
+// icy style metadata
+func (m *MetaData) getIcyMeta() []byte {
+	var metaSize byte
+	var result string
+	result = "StreamTitle='" + m.StreamTitle + "';"
+	metaSize = (byte)(math.Ceil(float64(len(result)) / 16.0))
+
+	meta := make([]byte, metaSize*16+1)
+	meta[0] = metaSize
+
+	for idx := 0; idx < len(result); idx++ {
+		meta[idx+1] = result[idx]
+	}
+
+	return meta
 }

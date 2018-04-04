@@ -17,8 +17,9 @@ type Properties struct {
 	}
 
 	Limits struct {
-		Clients int
-		Sources int
+		Clients           int
+		Sources           int
+		SourceIdleTimeOut int
 	}
 
 	Auth struct {

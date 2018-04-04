@@ -2,6 +2,7 @@ package iceserver
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -51,7 +52,7 @@ func (i *IceServer) logHeaders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
-	if i.Props.Logging.Loglevel == 4 {
+	if i.Props.Logging.Loglevel == 3 {
 		i.logHeaders(w, r)
 	}
 
@@ -64,60 +65,70 @@ func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 }
 
 func (i *IceServer) readMount(idx int, w http.ResponseWriter, r *http.Request) {
+	var mount *Mount
 	bytessended := 0
 	writed := 0
 	var err error
 	start := time.Now()
+	mount = &i.Props.Mounts[idx]
 
-	i.printError(3, "readMount "+i.Props.Mounts[idx].Name)
-	i.Props.Mounts[idx].Status.Listeners++
+	i.printError(3, "readMount "+mount.Name)
+	mount.incListeners()
 	defer i.closeMount(idx, false, &bytessended, start, r)
 
 	w.Header().Set("Server", i.serverName+" "+i.version)
-	w.Header().Set("Content-Type", i.Props.Mounts[idx].ContentType)
-	w.Header().Set("x-audiocast-name", i.Props.Mounts[idx].Name)
-	w.Header().Set("x-audiocast-genre", i.Props.Mounts[idx].Genre)
-	w.Header().Set("x-audiocast-url", i.Props.Mounts[idx].StreamURL)
+	w.Header().Set("Content-Type", mount.ContentType)
+	w.Header().Set("x-audiocast-name", mount.Name)
+	w.Header().Set("x-audiocast-genre", mount.Genre)
+	w.Header().Set("x-audiocast-url", mount.StreamURL)
 	w.Header().Set("x-audiocast-public", "0")
-	w.Header().Set("x-audiocast-bitrate", strconv.Itoa(i.Props.Mounts[idx].BitRate))
-	w.Header().Set("x-audiocast-description", i.Props.Mounts[idx].Description)
+	w.Header().Set("x-audiocast-bitrate", strconv.Itoa(mount.BitRate))
+	w.Header().Set("x-audiocast-description", mount.Description)
+	//w.Header().Set("icy-metaint", strconv.Itoa(mount.State.MetaInfo.MetaInt))
 
 	w.WriteHeader(http.StatusOK)
 	defer r.Body.Close()
 
+	flusher, _ := w.(http.Flusher)
+
 	for {
-		writed, err = w.Write(i.Props.Mounts[idx].buffer)
+		writed, err = w.Write(mount.buffer)
 
 		if err != nil {
 			i.printError(1, err.Error())
 			break
 		}
 		bytessended += writed
-
-		flusher, _ := w.(http.Flusher)
 		flusher.Flush()
 		time.Sleep(1 * time.Second)
 	}
 }
 
 func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) {
-	if i.Props.Mounts[idx].Status.Status != "On air" {
-		err := i.Props.Mounts[idx].auth(w, r)
+	var mount *Mount
+	mount = &i.Props.Mounts[idx]
+
+	mount.mux.Lock()
+	if mount.State.Status != "On air" {
+		err := mount.auth(w, r)
 		if err != nil {
+			mount.mux.Unlock()
 			i.printError(1, err.Error())
 			return
 		}
-		i.Props.Mounts[idx].writeICEHeaders(w, r)
-		i.Props.Mounts[idx].Status.Status = "On air"
-		i.Props.Mounts[idx].Status.Started = time.Now().Format(time.RFC1123Z)
+		mount.writeICEHeaders(w, r)
+		mount.State.Status = "On air"
+		mount.State.Started = time.Now().Format(time.RFC1123Z)
 	}
+	mount.mux.Unlock()
 
 	bytessended := 0
+	idle := 0
 	readed := 0
 	var err error
 	start := time.Now()
 
-	i.printError(3, "writeMount "+i.Props.Mounts[idx].Name)
+	i.printError(3, "writeMount "+mount.Name)
 	defer i.closeMount(idx, true, &bytessended, start, r)
 
 	hj, ok := w.(http.Hijacker)
@@ -135,13 +146,19 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 	defer conn.Close()
 
 	for {
-		readed, err = bufrw.Read(i.Props.Mounts[idx].buffer)
+		readed, err = bufrw.Read(mount.buffer)
 		if err != nil {
+			if err == io.EOF {
+				idle++
+				if idle >= i.Props.Limits.SourceIdleTimeOut {
+					break
+				}
+			}
 			i.printError(3, err.Error())
+		} else {
+			idle = 0
 		}
-
 		bytessended += readed
-
 		i.printError(3, "writeMount readed="+strconv.Itoa(readed))
 		time.Sleep(1 * time.Second)
 	}
