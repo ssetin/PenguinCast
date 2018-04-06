@@ -12,7 +12,7 @@ import (
 
 const (
 	cServerName = "PenguinCast"
-	cVersion    = "0.01e"
+	cVersion    = "0.01f"
 )
 
 // IceServer ...
@@ -45,14 +45,22 @@ func (i *IceServer) Init() error {
 	if err != nil {
 		return err
 	}
-	i.initMounts()
+	err = i.initMounts()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (i *IceServer) initMounts() {
+func (i *IceServer) initMounts() error {
+	var err error
 	for idx := range i.Props.Mounts {
-		i.Props.Mounts[idx].Init(i)
+		err = i.Props.Mounts[idx].Init(i)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // Close - finish
@@ -60,6 +68,9 @@ func (i *IceServer) Close() {
 	log.Print("Stopping " + i.serverName + "...")
 	i.logErrorFile.Close()
 	i.logAccessFile.Close()
+	for idx := range i.Props.Mounts {
+		i.Props.Mounts[idx].Close()
+	}
 	log.Println("Ok!")
 }
 

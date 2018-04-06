@@ -1,15 +1,10 @@
 package iceserver
 
-/*
-	TODO:
-	- buffer queue
-	- meta info
-*/
-
 import (
 	"encoding/base64"
 	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,6 +26,8 @@ type Mount struct {
 	ContentType string
 	StreamURL   string
 	Genre       string
+	BurstSize   int
+	DumpFile    string
 
 	State struct {
 		Status    string
@@ -39,20 +36,33 @@ type Mount struct {
 		Listeners int
 	}
 
-	mux        sync.Mutex
-	Server     *IceServer
-	BufferSize int
-	buffer     []byte
+	mux      sync.Mutex
+	Server   *IceServer
+	buffer   BufferQueue
+	dumpFile *os.File
 }
 
 //Init ...
 func (m *Mount) Init(srv *IceServer) error {
 	m.Server = srv
 	m.Clear()
-	m.State.MetaInfo.MetaInt = 16384
-	m.BufferSize = m.BitRate * 1024 / 8
-	m.buffer = make([]byte, m.BufferSize+m.State.MetaInfo.MetaInt)
+	m.State.MetaInfo.MetaInt = 0
+	m.buffer.Init(srv.Props.Limits.MaxBufferLength)
+	if m.DumpFile > "" {
+		var err error
+		m.dumpFile, err = os.OpenFile(srv.Props.Paths.Log+m.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+//Close ...
+func (m *Mount) Close() {
+	if m.dumpFile != nil {
+		m.dumpFile.Close()
+	}
 }
 
 //Clear ...

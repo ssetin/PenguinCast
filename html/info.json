@@ -1,8 +1,6 @@
 {
-    "Mounts": [ 
-{{range $index,$element := .}}
-{{if $index}},{{end}}
-  {
+    "Mounts": [{{range $index,$element := .}}{{if $index}},{{end}}
+    {
         "Name ": "{{.Name}}",
         "Status": "{{.State.Status}}",
         "Started": "{{.State.Started}}",
@@ -13,6 +11,5 @@
         "Listeners (current)": "{{.State.Listeners}}",
         "Stream URL": "{{.StreamURL}}",
         "Currently playing": "{{.State.MetaInfo.StreamTitle}}"
-    }
-{{end}}
+    }{{end}}
 ]}

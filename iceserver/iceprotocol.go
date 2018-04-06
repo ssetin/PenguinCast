@@ -1,5 +1,10 @@
 package iceserver
 
+/*
+	TODO:
+	- meta info
+*/
+
 import (
 	"fmt"
 	"io"
@@ -51,6 +56,10 @@ func (i *IceServer) logHeaders(w http.ResponseWriter, r *http.Request) {
 	i.printError(4, "\n"+request)
 }
 
+/*
+	openMount
+    Decide what to do, according to HTTP method
+*/
 func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 	if i.Props.Logging.Loglevel == 3 {
 		i.logHeaders(w, r)
@@ -64,11 +73,17 @@ func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 
 }
 
+/*
+	readMount
+    Send stream from requested mount to client
+*/
 func (i *IceServer) readMount(idx int, w http.ResponseWriter, r *http.Request) {
 	var mount *Mount
 	bytessended := 0
 	writed := 0
+	idle := 0
 	var err error
+	var pack, nextpack *BufElement
 	start := time.Now()
 	mount = &i.Props.Mounts[idx]
 
@@ -84,26 +99,58 @@ func (i *IceServer) readMount(idx int, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("x-audiocast-public", "0")
 	w.Header().Set("x-audiocast-bitrate", strconv.Itoa(mount.BitRate))
 	w.Header().Set("x-audiocast-description", mount.Description)
-	//w.Header().Set("icy-metaint", strconv.Itoa(mount.State.MetaInfo.MetaInt))
+	w.Header().Set("icy-metaint", strconv.Itoa(mount.State.MetaInfo.MetaInt))
 
 	w.WriteHeader(http.StatusOK)
 	defer r.Body.Close()
-
 	flusher, _ := w.(http.Flusher)
 
+	pack = mount.buffer.First()
+
+	if pack == nil {
+		i.printError(1, "readMount Empty buffer")
+		return
+	}
+
 	for {
-		writed, err = w.Write(mount.buffer)
+		writed, err = w.Write(pack.buffer)
 
 		if err != nil {
 			i.printError(1, err.Error())
 			break
 		}
 		bytessended += writed
-		flusher.Flush()
-		time.Sleep(1 * time.Second)
+
+		// where we are?
+		i.printError(4, "ReadBuffer "+strconv.Itoa(pack.iam)+"/"+strconv.Itoa(mount.buffer.Size()))
+
+		// collect burst data in buffer whithout flashing
+		if bytessended > mount.BurstSize {
+			flusher.Flush()
+			time.Sleep(1000 * time.Millisecond)
+		}
+
+		nextpack = pack.Next()
+		if nextpack == nil {
+			idle++
+			if idle >= i.Props.Limits.EmptyBufferIdleTimeOut {
+				i.printError(1, "Empty Buffer idle time is reached")
+				break
+			}
+			continue
+		} else {
+			idle = 0
+		}
+
+		pack = nextpack
 	}
+
 }
 
+/*
+	writeMount
+    Authenticate SOURCE and write stream from it to appropriate mount buffer
+*/
 func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) {
 	var mount *Mount
 	mount = &i.Props.Mounts[idx]
@@ -126,6 +173,7 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 	idle := 0
 	readed := 0
 	var err error
+	var buff []byte
 	start := time.Now()
 
 	i.printError(3, "writeMount "+mount.Name)
@@ -145,12 +193,16 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 	}
 	defer conn.Close()
 
+	// max bytes per second according to bitrate
+	buff = make([]byte, mount.BitRate*1024/8)
+
 	for {
-		readed, err = bufrw.Read(mount.buffer)
+		readed, err = bufrw.Read(buff)
 		if err != nil {
 			if err == io.EOF {
 				idle++
 				if idle >= i.Props.Limits.SourceIdleTimeOut {
+					i.printError(1, "Source idle time is reached")
 					break
 				}
 			}
@@ -158,8 +210,15 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		} else {
 			idle = 0
 		}
+		// append to the buffer's queue based on actual readed bytes
+		mount.buffer.Append(buff, readed)
 		bytessended += readed
-		i.printError(3, "writeMount readed="+strconv.Itoa(readed))
-		time.Sleep(1 * time.Second)
+		i.printError(4, "writeMount "+strconv.Itoa(readed)+"")
+
+		if mount.dumpFile != nil {
+			mount.dumpFile.Write(mount.buffer.Last().buffer)
+		}
+
+		time.Sleep(1000 * time.Millisecond)
 	}
 }

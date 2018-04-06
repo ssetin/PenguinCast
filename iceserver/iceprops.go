@@ -17,9 +17,11 @@ type Properties struct {
 	}
 
 	Limits struct {
-		Clients           int
-		Sources           int
-		SourceIdleTimeOut int
+		Clients                int
+		Sources                int
+		SourceIdleTimeOut      int
+		EmptyBufferIdleTimeOut int
+		MaxBufferLength        int
 	}
 
 	Auth struct {
