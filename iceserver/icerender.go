@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 )
 
@@ -45,14 +46,25 @@ func (i *IceServer) loadPage(filename string) ([]byte, error) {
 	return body, nil
 }
 
-func (i *IceServer) checkPage(w http.ResponseWriter, r *http.Request) (string, int, error) {
+/*
+	checkPage - return request object
+	filename, mount index, command index or error
+*/
+
+func (i *IceServer) checkPage(w http.ResponseWriter, r *http.Request) (string, int, int, error) {
+	docname := path.Base(r.URL.Path)
 	filename := filepath.Join(i.Props.Paths.Web, filepath.Clean(r.URL.Path))
-	mountidx := i.checkIsMount(filename)
+	mountidx := i.checkIsMount(docname)
 
 	i.printError(4, "checkPage filename="+filename)
 
 	if mountidx >= 0 {
-		return "", mountidx, nil
+		return "", mountidx, -1, nil
+	}
+
+	cmdidx := i.checkIsCommand(docname, r)
+	if cmdidx >= 0 {
+		return "", -1, cmdidx, nil
 	}
 
 	info, err := os.Stat(filename)
@@ -60,14 +72,14 @@ func (i *IceServer) checkPage(w http.ResponseWriter, r *http.Request) (string, i
 		if os.IsNotExist(err) {
 			i.printError(1, err.Error())
 			i.setNotFound(w, r)
-			return "", -1, err
+			return "", -1, -1, err
 		}
 	}
 
 	if info.IsDir() {
 		http.Redirect(w, r, "/info.html", 301)
-		return "", -1, errors.New("Redirected to root from " + filename)
+		return "", -1, -1, errors.New("Redirected to root from " + filename)
 	}
 
-	return filename, -1, nil
+	return filename, -1, -1, nil
 }

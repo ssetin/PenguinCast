@@ -61,16 +61,11 @@ func (i *IceServer) logHeaders(w http.ResponseWriter, r *http.Request) {
     Decide what to do, according to HTTP method
 */
 func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
-	if i.Props.Logging.Loglevel == 3 {
-		i.logHeaders(w, r)
-	}
-
 	if r.Method == "SOURCE" {
 		i.writeMount(idx, w, r)
 	} else {
 		i.readMount(idx, w, r)
 	}
-
 }
 
 /*
@@ -221,4 +216,11 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 
 		time.Sleep(1000 * time.Millisecond)
 	}
+}
+
+/*
+	formatWithMeta
+*/
+func (i *IceServer) formatWithMeta(mount *Mount) {
+
 }

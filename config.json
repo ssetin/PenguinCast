@@ -1,9 +1,9 @@
 {
     "Name": "Rollstation radio",
-	"Admin": "admin@penguin.com",
+    "Admin": "admin@penguin.com",
     "Location": "Saint Petersburg",
     "Host": "http://127.0.0.1",
-	"Socket": { "Port": 8008},
+    "Socket": { "Port": 8008},
     "Limits": {"Clients": 30, "Sources": 5, "SourceIdleTimeOut": 5,"EmptyBufferIdleTimeOut": 5, "MaxBufferSize":20},
     "Auth": {"AdminPassword": "admin"},
     "Paths": {"Log": "log/", "Web":"html/"},

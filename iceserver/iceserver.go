@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -13,6 +13,10 @@ import (
 const (
 	cServerName = "PenguinCast"
 	cVersion    = "0.01f"
+)
+
+var (
+	vCommands = [...]string{"metadata"}
 )
 
 // IceServer ...
@@ -76,7 +80,16 @@ func (i *IceServer) Close() {
 
 func (i *IceServer) checkIsMount(page string) int {
 	for idx := range i.Props.Mounts {
-		if filepath.Clean(i.Props.Paths.Web+i.Props.Mounts[idx].Name) == page {
+		if i.Props.Mounts[idx].Name == page {
+			return idx
+		}
+	}
+	return -1
+}
+
+func (i *IceServer) checkIsCommand(page string, r *http.Request) int {
+	for idx := range vCommands {
+		if vCommands[idx] == page && r.URL.Query().Get("mode") == "updinfo" {
 			return idx
 		}
 	}
@@ -88,7 +101,7 @@ func (i *IceServer) handler(w http.ResponseWriter, r *http.Request) {
 		i.logHeaders(w, r)
 	}
 
-	page, mountidx, err := i.checkPage(w, r)
+	page, mountidx, cmdidx, err := i.checkPage(w, r)
 	if err != nil {
 		i.printError(1, err.Error())
 		return
@@ -99,11 +112,31 @@ func (i *IceServer) handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if cmdidx >= 0 {
+		i.runCommand(cmdidx, w, r)
+		return
+	}
+
 	if strings.HasSuffix(page, "info.html") || strings.HasSuffix(page, "info.json") {
 		i.renderMounts(w, r, page)
 	} else {
 		http.ServeFile(w, r, page)
 	}
+}
+
+/*
+	runCommand
+*/
+func (i *IceServer) runCommand(idx int, w http.ResponseWriter, r *http.Request) {
+	if idx == 0 {
+		mountname := path.Base(r.URL.Query().Get("mount"))
+		i.printError(4, "runCommand 0 with "+mountname)
+		midx := i.checkIsMount(mountname)
+		if midx >= 0 {
+			i.Props.Mounts[midx].updateMeta(w, r)
+		}
+	}
+
 }
 
 /*Start - start listening port ...*/

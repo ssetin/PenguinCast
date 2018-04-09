@@ -46,7 +46,7 @@ type Mount struct {
 func (m *Mount) Init(srv *IceServer) error {
 	m.Server = srv
 	m.Clear()
-	m.State.MetaInfo.MetaInt = 0
+	m.State.MetaInfo.MetaInt = 0 //8192
 	m.buffer.Init(srv.Props.Limits.MaxBufferLength)
 	if m.DumpFile > "" {
 		var err error
@@ -142,6 +142,19 @@ func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
 	m.ContentType = r.Header.Get("content-type")
 	m.StreamURL = r.Header.Get("ice-url")
 	m.Description = r.Header.Get("ice-description")
+}
+
+func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
+	m.mux.Lock()
+	if m.State.Status != "On air" {
+		err := m.auth(w, r)
+		if err != nil {
+			m.mux.Unlock()
+			return
+		}
+	}
+	m.State.MetaInfo.StreamTitle = r.URL.Query().Get("song")
+	m.mux.Unlock()
 }
 
 /* MetaData */
