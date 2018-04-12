@@ -33,6 +33,7 @@ a {
 	color: #0004fc;
 	text-decoration: none;
 	border-bottom: 1px dotted #0004fc;
+	display: inline-block;
 }
 
 a:hover {

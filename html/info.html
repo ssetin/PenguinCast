@@ -4,7 +4,7 @@
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />	
 	<link rel="stylesheet" type="text/css" href="/style.css" />
 	<link rel="shortcut icon" href="/favicon.ico" />
-	<title>PenguinCast</title>
+	<title>{{.Props.Name}}</title>
   </head>
   <body>
 	<div>
@@ -12,7 +12,7 @@
 		<h1 class="left mainheader">PenguinCast</h1>
 	</div><div class="clear"></div>
 		<div>
-			{{range .}}
+			{{range .Props.Mounts}}
 			<table class="greyGridTable">
 				<tr>
 					<th><h3>{{.Name}}</h3></th>
@@ -59,8 +59,9 @@
 		</div>
 	</div>
 	<div id="footer">
+		admin: <a href="mailto:{{.Props.Admin}}">{{.Props.Admin}}</a>, location: {{.Props.Location}}<br/>
 		No support, just take fun with radio<br/>
-		* inspired by the icecast project
+		* inspired by the icecast
 	</div>
 	</body>
 </html>

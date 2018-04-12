@@ -46,7 +46,7 @@ type Mount struct {
 func (m *Mount) Init(srv *IceServer) error {
 	m.Server = srv
 	m.Clear()
-	m.State.MetaInfo.MetaInt = 0 //8192
+	m.State.MetaInfo.MetaInt = m.BitRate * 1024 / 8 * 10
 	m.buffer.Init(srv.Props.Limits.MaxBufferLength)
 	if m.DumpFile > "" {
 		var err error
@@ -157,13 +157,19 @@ func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
 	m.mux.Unlock()
 }
 
-/* MetaData */
 // icy style metadata
-func (m *MetaData) getIcyMeta() []byte {
+func (m *Mount) getIcyMeta() []byte {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
 	var metaSize byte
 	var result string
-	result = "StreamTitle='" + m.StreamTitle + "';"
-	metaSize = (byte)(math.Ceil(float64(len(result)) / 16.0))
+	if m.State.MetaInfo.StreamTitle > "" {
+		result = "StreamTitle='" + m.State.MetaInfo.StreamTitle + "';"
+	} else {
+		result = "StreamTitle='" + m.Description + "';"
+	}
+	metaSize = byte(math.Ceil(float64(len(result)) / 16.0))
 
 	meta := make([]byte, metaSize*16+1)
 	meta[0] = metaSize

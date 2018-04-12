@@ -1,6 +1,6 @@
 {
     "Name": "Rollstation radio",
-    "Admin": "admin@penguin.com",
+    "Admin": "admin@site.com",
     "Location": "Saint Petersburg",
     "Host": "http://127.0.0.1",
     "Socket": { "Port": 8008},

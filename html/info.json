@@ -1,5 +1,5 @@
 {
-    "Mounts": [{{range $index,$element := .}}{{if $index}},{{end}}
+    "Mounts": [{{range $index,$element := .Props.Mounts}}{{if $index}},{{end}}
     {
         "Name ": "{{.Name}}",
         "Status": "{{.State.Status}}",

@@ -2,12 +2,13 @@ package iceserver
 
 /*
 	TODO:
-	- meta info
+	- icecast-style meta info
 */
 
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -64,7 +65,11 @@ func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 	if r.Method == "SOURCE" {
 		i.writeMount(idx, w, r)
 	} else {
-		i.readMount(idx, w, r)
+		var im = false
+		if r.Header.Get("icy-metadata") == "1" {
+			im = true
+		}
+		i.readMount(idx, im, w, r)
 	}
 }
 
@@ -72,13 +77,19 @@ func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 	readMount
     Send stream from requested mount to client
 */
-func (i *IceServer) readMount(idx int, w http.ResponseWriter, r *http.Request) {
+func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *http.Request) {
 	var mount *Mount
+	var err error
+	var pack, nextpack *BufElement
+
 	bytessended := 0
 	writed := 0
 	idle := 0
-	var err error
-	var pack, nextpack *BufElement
+	offset := 0
+	nometabytes := 0
+	nmtmp := 0
+	delta := 0
+
 	start := time.Now()
 	mount = &i.Props.Mounts[idx]
 
@@ -94,7 +105,9 @@ func (i *IceServer) readMount(idx int, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("x-audiocast-public", "0")
 	w.Header().Set("x-audiocast-bitrate", strconv.Itoa(mount.BitRate))
 	w.Header().Set("x-audiocast-description", mount.Description)
-	w.Header().Set("icy-metaint", strconv.Itoa(mount.State.MetaInfo.MetaInt))
+	if icymeta {
+		w.Header().Set("icy-metaint", strconv.Itoa(mount.State.MetaInfo.MetaInt))
+	}
 
 	w.WriteHeader(http.StatusOK)
 	defer r.Body.Close()
@@ -108,13 +121,53 @@ func (i *IceServer) readMount(idx int, w http.ResponseWriter, r *http.Request) {
 	}
 
 	for {
-		writed, err = w.Write(pack.buffer)
+		if icymeta {
+			meta := mount.getIcyMeta()
+			metalen := len(meta)
+			packlen := len(pack.buffer)
+
+			if nometabytes+packlen+delta > mount.State.MetaInfo.MetaInt {
+				offset = mount.State.MetaInfo.MetaInt - nometabytes - delta
+
+				//log.Printf("*** write block with meta ***")
+				//log.Printf("   offset = %d - %d(nometabytes) - %d (delta) = %d", mount.State.MetaInfo.MetaInt, nometabytes, delta, offset)
+
+				if offset < 0 || offset >= packlen {
+					i.printError(3, "Bad metainfo offset %d", offset)
+					log.Printf("!!! Bad metainfo offset %d ***", offset)
+					offset = 0
+				}
+
+				part1 := make([]byte, offset)
+				part2 := make([]byte, packlen-offset)
+
+				copy(part1, pack.buffer[:offset])
+				copy(part2, pack.buffer[offset:])
+
+				buff := append(part1, meta...)
+				buff = append(buff, part2...)
+				writed, err = w.Write(buff)
+
+				delta = writed - offset - metalen
+				nometabytes = 0
+				nmtmp = 0
+
+				//log.Printf("   delta = %d(writed) - %d(offset) - %d(metalen) = %d", writed, offset, metalen, delta)
+			} else {
+				writed = 0
+				nmtmp, err = w.Write(pack.buffer)
+				nometabytes += nmtmp
+			}
+		} else {
+			writed, err = w.Write(pack.buffer)
+		}
 
 		if err != nil {
 			i.printError(1, err.Error())
 			break
 		}
-		bytessended += writed
+
+		bytessended += writed + nmtmp
 
 		// where we are?
 		i.printError(4, "ReadBuffer "+strconv.Itoa(pack.iam)+"/"+strconv.Itoa(mount.buffer.Size()))
@@ -216,11 +269,4 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 
 		time.Sleep(1000 * time.Millisecond)
 	}
-}
-
-/*
-	formatWithMeta
-*/
-func (i *IceServer) formatWithMeta(mount *Mount) {
-
 }

@@ -10,6 +10,7 @@ import "sync"
 //BufElement ...
 type BufElement struct {
 	iam    int /*temporary*/
+	used   int
 	buffer []byte
 	next   *BufElement
 }
@@ -25,12 +26,13 @@ type BufferQueue struct {
 // NewbufElement ...
 func NewbufElement() *BufElement {
 	var t *BufElement
-	t = &BufElement{}
+	t = &BufElement{used: 0}
 	return t
 }
 
 //Next ...
 func (q *BufElement) Next() *BufElement {
+	q.used++
 	return q.next
 }
 

@@ -29,7 +29,7 @@ func (i *IceServer) renderMounts(w http.ResponseWriter, r *http.Request, tplname
 		i.setInternal(w, r)
 		return
 	}
-	err = t.Execute(w, &i.Props.Mounts)
+	err = t.Execute(w, &i)
 	if err != nil {
 		i.printError(1, err.Error())
 		i.setInternal(w, r)
@@ -53,11 +53,8 @@ func (i *IceServer) loadPage(filename string) ([]byte, error) {
 
 func (i *IceServer) checkPage(w http.ResponseWriter, r *http.Request) (string, int, int, error) {
 	docname := path.Base(r.URL.Path)
-	filename := filepath.Join(i.Props.Paths.Web, filepath.Clean(r.URL.Path))
+
 	mountidx := i.checkIsMount(docname)
-
-	i.printError(4, "checkPage filename="+filename)
-
 	if mountidx >= 0 {
 		return "", mountidx, -1, nil
 	}
@@ -66,6 +63,9 @@ func (i *IceServer) checkPage(w http.ResponseWriter, r *http.Request) (string, i
 	if cmdidx >= 0 {
 		return "", -1, cmdidx, nil
 	}
+
+	filename := filepath.Join(i.Props.Paths.Web, filepath.Clean(r.URL.Path))
+	i.printError(4, "checkPage filename="+filename)
 
 	info, err := os.Stat(filename)
 	if err != nil {
