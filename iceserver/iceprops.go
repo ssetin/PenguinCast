@@ -21,7 +21,6 @@ type Properties struct {
 		Sources                int
 		SourceIdleTimeOut      int
 		EmptyBufferIdleTimeOut int
-		MaxBufferLength        int
 	}
 
 	Auth struct {

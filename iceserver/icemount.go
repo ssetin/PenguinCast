@@ -47,7 +47,7 @@ func (m *Mount) Init(srv *IceServer) error {
 	m.Server = srv
 	m.Clear()
 	m.State.MetaInfo.MetaInt = m.BitRate * 1024 / 8 * 10
-	m.buffer.Init(srv.Props.Limits.MaxBufferLength)
+	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8) + 1)
 	if m.DumpFile > "" {
 		var err error
 		m.dumpFile, err = os.OpenFile(srv.Props.Paths.Log+m.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)

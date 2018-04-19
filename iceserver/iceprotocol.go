@@ -121,6 +121,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	}
 
 	for {
+		pack.Lock()
 		if icymeta {
 			meta := mount.getIcyMeta()
 			metalen := len(meta)
@@ -164,21 +165,20 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 		if err != nil {
 			i.printError(1, err.Error())
+			pack.UnLock()
 			break
 		}
 
 		bytessended += writed + nmtmp
 
-		// where we are?
-		i.printError(4, "ReadBuffer "+strconv.Itoa(pack.iam)+"/"+strconv.Itoa(mount.buffer.Size()))
-
 		// collect burst data in buffer whithout flashing
-		if bytessended > mount.BurstSize {
+		if bytessended >= mount.BurstSize {
 			flusher.Flush()
 			time.Sleep(1000 * time.Millisecond)
 		}
 
 		nextpack = pack.Next()
+		pack.UnLock()
 		if nextpack == nil {
 			idle++
 			if idle >= i.Props.Limits.EmptyBufferIdleTimeOut {
@@ -189,7 +189,6 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		} else {
 			idle = 0
 		}
-
 		pack = nextpack
 	}
 
@@ -268,5 +267,9 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		}
 
 		time.Sleep(1000 * time.Millisecond)
+		//mount.buffer.Print()
+
+		//check if maxbuffersize reached and truncate it
+		mount.buffer.checkAndTruncate()
 	}
 }

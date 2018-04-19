@@ -22,7 +22,7 @@ Configuration parameters are stored in config.json.
     "Socket": { "Port": 8008},
     "Limits": {
         "Clients": 30, "Sources": 5, 
-        "SourceIdleTimeOut": 5, "EmptyBufferIdleTimeOut": 5, "MaxBufferSize":20
+        "SourceIdleTimeOut": 5, "EmptyBufferIdleTimeOut": 5
     },
     "Auth": {"AdminPassword": "admin"},
     "Paths": {"Log": "log/", "Web":"html/"},
@@ -45,7 +45,6 @@ Configuration parameters are stored in config.json.
 - Sources - maximum Sources per server
 - SourceIdleTimeOut - data timeout for source
 - EmptyBufferIdleTimeOut - silence timeout for client
-- MaxBufferSize - buffer queue size limit (number of items)
 
 #### Mounts
 - Name - required, mount point name
