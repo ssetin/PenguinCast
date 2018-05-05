@@ -62,7 +62,7 @@ func (i *IceServer) logHeaders(w http.ResponseWriter, r *http.Request) {
     Decide what to do, according to HTTP method
 */
 func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
-	if r.Method == "SOURCE" {
+	if r.Method == "SOURCE" || r.Method == "PUT" {
 		i.writeMount(idx, w, r)
 	} else {
 		var im = false
@@ -89,6 +89,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	nometabytes := 0
 	nmtmp := 0
 	delta := 0
+	n := 0
 
 	start := time.Now()
 	mount = &i.Props.Mounts[idx]
@@ -96,9 +97,11 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	i.printError(3, "readMount "+mount.Name)
 	mount.incListeners()
 	defer i.closeMount(idx, false, &bytessended, start, r)
+	defer r.Body.Close()
 
 	w.Header().Set("Server", i.serverName+" "+i.version)
 	w.Header().Set("Content-Type", mount.ContentType)
+	//w.Header().Set("Connection", "Keep-Alive")
 	w.Header().Set("x-audiocast-name", mount.Name)
 	w.Header().Set("x-audiocast-genre", mount.Genre)
 	w.Header().Set("x-audiocast-url", mount.StreamURL)
@@ -110,7 +113,6 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	}
 
 	w.WriteHeader(http.StatusOK)
-	defer r.Body.Close()
 	flusher, _ := w.(http.Flusher)
 
 	pack = mount.buffer.First()
@@ -121,6 +123,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	}
 
 	for {
+		n++
 		pack.Lock()
 		if icymeta {
 			meta := mount.getIcyMeta()
@@ -128,6 +131,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 			packlen := len(pack.buffer)
 
 			if nometabytes+packlen+delta > mount.State.MetaInfo.MetaInt {
+				var partwrited int
 				offset = mount.State.MetaInfo.MetaInt - nometabytes - delta
 
 				//log.Printf("*** write block with meta ***")
@@ -139,15 +143,12 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 					offset = 0
 				}
 
-				part1 := make([]byte, offset)
-				part2 := make([]byte, packlen-offset)
-
-				copy(part1, pack.buffer[:offset])
-				copy(part2, pack.buffer[offset:])
-
-				buff := append(part1, meta...)
-				buff = append(buff, part2...)
-				writed, err = w.Write(buff)
+				partwrited, err = w.Write(pack.buffer[:offset])
+				writed += partwrited
+				partwrited, err = w.Write(meta)
+				writed += partwrited
+				partwrited, err = w.Write(pack.buffer[offset:])
+				writed += partwrited
 
 				delta = writed - offset - metalen
 				nometabytes = 0
@@ -164,7 +165,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		}
 
 		if err != nil {
-			i.printError(1, err.Error())
+			i.printError(1, "%d readMount "+err.Error(), n)
 			pack.UnLock()
 			break
 		}
@@ -191,7 +192,6 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		}
 		pack = nextpack
 	}
-
 }
 
 /*

@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -131,13 +132,36 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+func (m *Mount) getParams(paramstr string) map[string]string {
+	var rex = regexp.MustCompile("(\\w+)=(\\w+)")
+	data := rex.FindAllStringSubmatch(paramstr, -1)
+	params := make(map[string]string)
+	for _, kv := range data {
+		k := kv[1]
+		v := kv[2]
+		params[k] = v
+	}
+	return params
+}
+
 func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
-	brate, err := strconv.Atoi(r.Header.Get("ice-bitrate"))
+	var bitratestr string
+	bitratestr = r.Header.Get("ice-bitrate")
+	if bitratestr == "" {
+		audioinfo := r.Header.Get("ice-audio-info")
+		if len(audioinfo) > 3 {
+			params := m.getParams(audioinfo)
+			bitratestr = params["bitrate"]
+		}
+	}
+
+	brate, err := strconv.Atoi(bitratestr)
 	if err != nil {
 		m.BitRate = 0
 	} else {
 		m.BitRate = brate
 	}
+
 	m.Genre = r.Header.Get("ice-genre")
 	m.ContentType = r.Header.Get("content-type")
 	m.StreamURL = r.Header.Get("ice-url")
@@ -153,7 +177,10 @@ func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	//song, _ := url.QueryUnescape(r.URL.Query().Get("song"))
 	m.State.MetaInfo.StreamTitle = r.URL.Query().Get("song")
+
 	m.mux.Unlock()
 }
 
