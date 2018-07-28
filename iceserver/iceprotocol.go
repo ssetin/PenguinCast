@@ -220,7 +220,6 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 	idle := 0
 	readed := 0
 	var err error
-	var buff []byte
 	start := time.Now()
 
 	i.printError(3, "writeMount "+mount.Name)
@@ -240,10 +239,9 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 	}
 	defer conn.Close()
 
-	// max bytes per second according to bitrate
-	buff = make([]byte, mount.BitRate*1024/8)
-
 	for {
+		// max bytes per second according to bitrateclear
+		buff := make([]byte, mount.BitRate*1024/8)
 		readed, err = bufrw.Read(buff)
 		if err != nil {
 			if err == io.EOF {

@@ -35,8 +35,8 @@ func NewbufElement() *BufElement {
 
 //Next ...
 func (q *BufElement) Next() *BufElement {
-	//q.mux.Lock()
-	//defer q.mux.Unlock()
+	q.mux.Lock()
+	defer q.mux.Unlock()
 	return q.next
 }
 
@@ -54,7 +54,7 @@ func (q *BufElement) UnLock() {
 	q.locked = false
 }
 
-//IsLocked ...
+//IsLocked (logical lock, mean it's in use)
 func (q *BufElement) IsLocked() bool {
 	q.mux.Lock()
 	defer q.mux.Unlock()
@@ -163,7 +163,9 @@ func (q *BufferQueue) Append(buffer []byte, readed int) {
 		return
 	}
 
+	q.last.mux.Lock()
 	q.last.next = t
+	q.last.mux.Unlock()
 	q.last = t
 	q.size++
 }

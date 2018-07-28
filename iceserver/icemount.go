@@ -2,6 +2,7 @@ package iceserver
 
 import (
 	"encoding/base64"
+	"io/ioutil"
 	"math"
 	"net/http"
 	"os"
@@ -9,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"golang.org/x/net/html/charset"
+	"golang.org/x/text/transform"
 )
 
 // MetaData ...
@@ -48,7 +52,7 @@ func (m *Mount) Init(srv *IceServer) error {
 	m.Server = srv
 	m.Clear()
 	m.State.MetaInfo.MetaInt = m.BitRate * 1024 / 8 * 10
-	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8) + 1)
+	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8) + 5)
 	if m.DumpFile > "" {
 		var err error
 		m.dumpFile, err = os.OpenFile(srv.Props.Paths.Log+m.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
@@ -68,6 +72,8 @@ func (m *Mount) Close() {
 
 //Clear ...
 func (m *Mount) Clear() {
+	m.mux.Lock()
+	defer m.mux.Unlock()
 	m.State.Status = "Offline"
 	m.State.Started = ""
 	m.zeroListeners()
@@ -90,8 +96,6 @@ func (m *Mount) decListeners() {
 }
 
 func (m *Mount) zeroListeners() {
-	m.mux.Lock()
-	defer m.mux.Unlock()
 	m.State.Listeners = 0
 }
 
@@ -170,18 +174,25 @@ func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
 
 func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
 	m.mux.Lock()
+	defer m.mux.Unlock()
 	if m.State.Status != "On air" {
 		err := m.auth(w, r)
 		if err != nil {
-			m.mux.Unlock()
 			return
 		}
 	}
 
-	//song, _ := url.QueryUnescape(r.URL.Query().Get("song"))
-	m.State.MetaInfo.StreamTitle = r.URL.Query().Get("song")
+	song := r.URL.Query().Get("song")
+	songReader := strings.NewReader(song)
 
-	m.mux.Unlock()
+	enc, _, _ := charset.DetermineEncoding(([]byte)(song), "")
+	utf8Reader := transform.NewReader(songReader, enc.NewDecoder())
+	result, err := ioutil.ReadAll(utf8Reader)
+	if err != nil {
+		m.State.MetaInfo.StreamTitle = ""
+		return
+	}
+	m.State.MetaInfo.StreamTitle = string(result[:])
 }
 
 // icy style metadata
