@@ -50,7 +50,6 @@ func (i *IceServer) loadPage(filename string) ([]byte, error) {
 	checkPage - return request object
 	filename, mount index, command index or error
 */
-
 func (i *IceServer) checkPage(w http.ResponseWriter, r *http.Request) (string, int, int, error) {
 	docname := path.Base(r.URL.Path)
 

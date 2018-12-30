@@ -10,10 +10,10 @@
     "Logging": {"Loglevel": 4, "Logsize": 50000},
     "Mounts": [
         {"Name": "RockRadio96", "User":"admin", "Password": "admin", "Genre":"Rock", 
-            "Description": "Rock radio station, Saint Petersburg", "BitRate":96, "BurstSize": 65536, "DumpFile": "rock96.mp3"
+            "Description": "Rock radio station, Saint Petersburg", "BitRate":96, "BurstSize": 65535, "DumpFile": "rock96.mp3"
         },
         {"Name": "JazzMe", "User":"admin", "Password": "admin",  "Genre":"Jazz", 
-            "Description": "Indie jazz radio station, Online cast", "BitRate":128, "BurstSize": 65536, "DumpFile": ""
+            "Description": "Indie jazz radio station, Online cast", "BitRate":128, "BurstSize": 65535, "DumpFile": ""
         }
     ]
 }

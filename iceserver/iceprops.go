@@ -7,38 +7,38 @@ import (
 
 // Properties ...
 type Properties struct {
-	Name     string
-	Admin    string
-	Location string
-	Host     string
+	Name     string `json:"Name"`
+	Admin    string `json:"Admin,omitempty"`
+	Location string `json:"Location,omitempty"`
+	Host     string `json:"Host"`
 
 	Socket struct {
-		Port int
-	}
+		Port int `json:"Port"`
+	} `json:"Socket"`
 
 	Limits struct {
-		Clients                int
-		Sources                int
-		SourceIdleTimeOut      int
-		EmptyBufferIdleTimeOut int
-	}
+		Clients                int `json:"Clients"`
+		Sources                int `json:"Sources"`
+		SourceIdleTimeOut      int `json:"SourceIdleTimeOut"`
+		EmptyBufferIdleTimeOut int `json:"EmptyBufferIdleTimeOut"`
+	} `json:"Limits"`
 
 	Auth struct {
-		AdminPassword string
-	}
+		AdminPassword string `json:"AdminPassword"`
+	} `json:"Auth"`
 
 	Paths struct {
-		Base string
-		Web  string
-		Log  string
-	}
+		Base string `json:"Base"`
+		Web  string `json:"Web"`
+		Log  string `json:"Log"`
+	} `json:"Paths"`
 
 	Logging struct {
-		Loglevel int
-		Logsize  int
-	}
+		Loglevel int `json:"Loglevel"`
+		Logsize  int `json:"Logsize"`
+	} `json:"Logging"`
 
-	Mounts []Mount
+	Mounts []Mount `json:"Mounts"`
 }
 
 func (i *IceServer) initConfig() error {

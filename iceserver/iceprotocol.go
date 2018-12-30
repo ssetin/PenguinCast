@@ -101,7 +101,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 	w.Header().Set("Server", i.serverName+" "+i.version)
 	w.Header().Set("Content-Type", mount.ContentType)
-	//w.Header().Set("Connection", "Keep-Alive")
+	w.Header().Set("Connection", "Keep-Alive")
 	w.Header().Set("x-audiocast-name", mount.Name)
 	w.Header().Set("x-audiocast-genre", mount.Genre)
 	w.Header().Set("x-audiocast-url", mount.StreamURL)

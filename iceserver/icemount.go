@@ -2,6 +2,7 @@ package iceserver
 
 import (
 	"encoding/base64"
+	"errors"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -23,26 +24,26 @@ type MetaData struct {
 
 // Mount ...
 type Mount struct {
-	Name        string
-	User        string
-	Password    string
-	Description string
-	BitRate     int
-	ContentType string
-	StreamURL   string
-	Genre       string
-	BurstSize   int
-	DumpFile    string
+	Name        string `json:"Name"`
+	User        string `json:"User"`
+	Password    string `json:"Password"`
+	Description string `json:"Description"`
+	BitRate     int    `json:"BitRate"`
+	ContentType string `json:"ContentType"`
+	StreamURL   string `json:"StreamURL"`
+	Genre       string `json:"Genre"`
+	BurstSize   int    `json:"BurstSize"`
+	DumpFile    string `json:"DumpFile"`
 
 	State struct {
 		Status    string
 		Started   string
 		MetaInfo  MetaData
 		Listeners int
-	}
+	} `json:"-"`
 
 	mux      sync.Mutex
-	Server   *IceServer
+	Server   *IceServer `json:"-"`
 	buffer   BufferQueue
 	dumpFile *os.File
 }
@@ -102,7 +103,16 @@ func (m *Mount) zeroListeners() {
 func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 	strAuth := r.Header.Get("authorization")
 
+	if strAuth == "" {
+		m.Server.sayHello(w, r)
+		return errors.New("No authorization field")
+	}
+
 	s := strings.SplitN(strAuth, " ", 2)
+	if len(s) != 2 {
+		http.Error(w, "Not authorized", 401)
+		return errors.New("Not authorized")
+	}
 
 	b, err := base64.StdEncoding.DecodeString(s[1])
 	if err != nil {
@@ -113,25 +123,15 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 	pair := strings.SplitN(string(b), ":", 2)
 	if len(pair) != 2 {
 		http.Error(w, "Not authorized", 401)
-		return err
+		return errors.New("Not authorized")
 	}
 
 	if m.Password != pair[1] && m.User != pair[0] {
 		http.Error(w, "Not authorized", 401)
-		return err
+		return errors.New("Wrong user or password")
 	}
 
-	w.Header().Set("Server", m.Server.serverName+"/"+m.Server.version)
-	w.Header().Set("Connection", "Keep-Alive")
-	w.Header().Set("Allow", "GET, SOURCE")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Transfer-Encoding", "chunked")
-	w.WriteHeader(http.StatusOK)
-
-	flusher, _ := w.(http.Flusher)
-	flusher.Flush()
+	m.Server.sayHello(w, r)
 
 	return nil
 }
@@ -168,18 +168,17 @@ func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
 
 	m.Genre = r.Header.Get("ice-genre")
 	m.ContentType = r.Header.Get("content-type")
-	m.StreamURL = r.Header.Get("ice-url")
+	//m.StreamURL = r.Header.Get("ice-url")
 	m.Description = r.Header.Get("ice-description")
 }
 
 func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	if m.State.Status != "On air" {
-		err := m.auth(w, r)
-		if err != nil {
-			return
-		}
+
+	err := m.auth(w, r)
+	if err != nil {
+		return
 	}
 
 	song := r.URL.Query().Get("song")

@@ -12,7 +12,7 @@ import (
 
 const (
 	cServerName = "PenguinCast"
-	cVersion    = "0.05d"
+	cVersion    = "0.06d"
 )
 
 var (
@@ -94,6 +94,20 @@ func (i *IceServer) checkIsCommand(page string, r *http.Request) int {
 		}
 	}
 	return -1
+}
+
+func (i *IceServer) sayHello(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Server", i.serverName+"/"+i.version)
+	w.Header().Set("Connection", "Keep-Alive")
+	w.Header().Set("Allow", "GET, SOURCE")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Transfer-Encoding", "chunked")
+	w.WriteHeader(http.StatusOK)
+
+	flusher, _ := w.(http.Flusher)
+	flusher.Flush()
 }
 
 func (i *IceServer) handler(w http.ResponseWriter, r *http.Request) {
