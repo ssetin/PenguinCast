@@ -38,8 +38,10 @@ func getHost(addr string) string {
 func (i *IceServer) closeMount(idx int, issource bool, bytessended *int, start time.Time, r *http.Request) {
 	if issource {
 		i.Props.Mounts[idx].Clear()
+		i.decSources()
 	} else {
 		i.Props.Mounts[idx].decListeners()
+		i.decListeners()
 	}
 	t := time.Now()
 	elapsed := t.Sub(start)
@@ -63,8 +65,18 @@ func (i *IceServer) logHeaders(w http.ResponseWriter, r *http.Request) {
 */
 func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 	if r.Method == "SOURCE" || r.Method == "PUT" {
+		if !i.checkSources() {
+			i.printError(1, "Number of sources exceeded")
+			http.Error(w, "Number of sources exceeded", 403)
+			return
+		}
 		i.writeMount(idx, w, r)
 	} else {
+		if !i.checkListeners() {
+			i.printError(1, "Number of listeners exceeded")
+			http.Error(w, "Number of listeners exceeded", 403)
+			return
+		}
 		var im = false
 		if r.Header.Get("icy-metadata") == "1" {
 			im = true
@@ -95,7 +107,6 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	mount = &i.Props.Mounts[idx]
 
 	i.printError(3, "readMount "+mount.Name)
-	mount.incListeners()
 	defer i.closeMount(idx, false, &bytessended, start, r)
 	defer r.Body.Close()
 
@@ -121,6 +132,9 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		i.printError(1, "readMount Empty buffer")
 		return
 	}
+
+	i.incListeners()
+	mount.incListeners()
 
 	for {
 		n++
@@ -238,6 +252,8 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	defer conn.Close()
+
+	i.incSources()
 
 	for {
 		// max bytes per second according to bitrateclear

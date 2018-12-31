@@ -24,16 +24,17 @@ type MetaData struct {
 
 // Mount ...
 type Mount struct {
-	Name        string `json:"Name"`
-	User        string `json:"User"`
-	Password    string `json:"Password"`
-	Description string `json:"Description"`
-	BitRate     int    `json:"BitRate"`
-	ContentType string `json:"ContentType"`
-	StreamURL   string `json:"StreamURL"`
-	Genre       string `json:"Genre"`
-	BurstSize   int    `json:"BurstSize"`
-	DumpFile    string `json:"DumpFile"`
+	Name         string `json:"Name"`
+	User         string `json:"User"`
+	Password     string `json:"Password"`
+	Description  string `json:"Description"`
+	BitRate      int    `json:"BitRate"`
+	ContentType  string `json:"ContentType"`
+	StreamURL    string `json:"StreamURL"`
+	Genre        string `json:"Genre"`
+	BurstSize    int    `json:"BurstSize"`
+	DumpFile     string `json:"DumpFile"`
+	MaxListeners int    `json:"MaxListeners"`
 
 	State struct {
 		Status    string

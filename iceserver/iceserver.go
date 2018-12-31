@@ -8,6 +8,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
@@ -26,6 +27,10 @@ type IceServer struct {
 
 	Props Properties
 
+	mux            sync.Mutex
+	ListenersCount int
+	SourcesCount   int
+
 	logError      *log.Logger
 	logErrorFile  *os.File
 	logAccess     *log.Logger
@@ -38,6 +43,9 @@ func (i *IceServer) Init() error {
 
 	i.serverName = cServerName
 	i.version = cVersion
+
+	i.ListenersCount = 0
+	i.SourcesCount = 0
 
 	log.Println("Starting " + i.serverName + " " + i.version)
 
@@ -65,6 +73,52 @@ func (i *IceServer) initMounts() error {
 		}
 	}
 	return nil
+}
+
+func (i *IceServer) incListeners() {
+	i.mux.Lock()
+	defer i.mux.Unlock()
+	i.ListenersCount++
+}
+
+func (i *IceServer) decListeners() {
+	i.mux.Lock()
+	defer i.mux.Unlock()
+	if i.ListenersCount > 0 {
+		i.ListenersCount--
+	}
+}
+
+func (i *IceServer) checkListeners() bool {
+	i.mux.Lock()
+	defer i.mux.Unlock()
+	if i.ListenersCount >= i.Props.Limits.Clients {
+		return false
+	}
+	return true
+}
+
+func (i *IceServer) incSources() {
+	i.mux.Lock()
+	defer i.mux.Unlock()
+	i.SourcesCount++
+}
+
+func (i *IceServer) decSources() {
+	i.mux.Lock()
+	defer i.mux.Unlock()
+	if i.SourcesCount > 0 {
+		i.SourcesCount--
+	}
+}
+
+func (i *IceServer) checkSources() bool {
+	i.mux.Lock()
+	defer i.mux.Unlock()
+	if i.SourcesCount >= i.Props.Limits.Sources {
+		return false
+	}
+	return true
 }
 
 // Close - finish

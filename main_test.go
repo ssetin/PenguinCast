@@ -12,8 +12,14 @@ import (
 	"github.com/ssetin/PenguinCast/iceserver"
 )
 
-const listenersCount = 20
-const secToListen = 30
+const (
+	listenersCount = 200
+	secToListen    = 60
+	mountName      = "RockRadio96"
+	bitRate        = 96
+	hostAddr       = "127.0.0.1:8008"
+	urlMount       = "http://" + hostAddr + "/" + mountName
+)
 
 var IcySrv iceserver.IceServer
 
@@ -41,24 +47,27 @@ func (p *penguinClient) Init(url string, dump string) error {
 }
 
 func (p *penguinClient) Listen() error {
-	conn, err := net.Dial("tcp", "127.0.0.1:8008")
+	conn, err := net.Dial("tcp", hostAddr)
 	defer conn.Close()
+	if p.dumpFile != nil {
+		defer p.dumpFile.Close()
+	}
 
-	var headerBuf string
-	sndBuff := make([]byte, 1024*96/8)
+	var headerStr string
 
-	headerBuf = "GET /RockRadio96 HTTP/1.0\r\n"
-	headerBuf += "icy-metadata: 1\r\n"
-	headerBuf += "user-agent: penguinClient/0.1\r\n"
-	headerBuf += "accept: */*\r\n"
-	headerBuf += "\r\n"
-	_, err = conn.Write([]byte(headerBuf))
+	headerStr = "GET /" + mountName + " HTTP/1.0\r\n"
+	headerStr += "icy-metadata: 1\r\n"
+	headerStr += "user-agent: penguinClient/0.1\r\n"
+	headerStr += "accept: */*\r\n"
+	headerStr += "\r\n"
+	_, err = conn.Write([]byte(headerStr))
 	if err != nil {
 		return err
 	}
 
-	bytesToFinish := secToListen * 96 * 1024 / 8
+	bytesToFinish := secToListen * bitRate * 1024 / 8
 	readedBytes := 0
+	sndBuff := make([]byte, 1024*bitRate/8)
 
 	for readedBytes <= bytesToFinish {
 		time.Sleep(time.Second)
@@ -71,10 +80,6 @@ func (p *penguinClient) Listen() error {
 			p.dumpFile.Write(sndBuff)
 		}
 		readedBytes += n
-	}
-
-	if p.dumpFile != nil {
-		p.dumpFile.Close()
 	}
 
 	return nil
@@ -108,13 +113,13 @@ func BenchmarkListenersCount(b *testing.B) {
 			defer wg.Done()
 
 			cl := &penguinClient{}
-			cl.Init("http://127.0.0.1:8008/RockRadio96", "dump/dump"+strconv.Itoa(i)+".mp3")
+			cl.Init(urlMount, "dump/"+mountName+"."+strconv.Itoa(i)+".mp3")
 			err := cl.Listen()
 			if err != nil {
-				log.Fatalln(err)
+				log.Println(err)
 			}
 		}(wg, i)
-		time.Sleep(time.Millisecond * 500)
+		time.Sleep(time.Millisecond * 100)
 
 	}
 	log.Println("Waiting for listeners to finito...")

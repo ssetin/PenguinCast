@@ -4,7 +4,7 @@
     "Location": "Saint Petersburg",
     "Host": "http://127.0.0.1",
     "Socket": { "Port": 8008},
-    "Limits": {"Clients": 30, "Sources": 5, "SourceIdleTimeOut": 5,"EmptyBufferIdleTimeOut": 5},
+    "Limits": {"Clients": 100000, "Sources": 5, "SourceIdleTimeOut": 5,"EmptyBufferIdleTimeOut": 5},
     "Auth": {"AdminPassword": "admin"},
     "Paths": {"Log": "log/", "Web":"html/"},
     "Logging": {"Loglevel": 4, "Logsize": 50000},
@@ -12,7 +12,7 @@
         {"Name": "RockRadio96", "User":"admin", "Password": "admin", "Genre":"Rock", 
             "Description": "Rock radio station, Saint Petersburg", "BitRate":96, "BurstSize": 65535, "DumpFile": "rock96.mp3"
         },
-        {"Name": "JazzMe", "User":"admin", "Password": "admin",  "Genre":"Jazz", 
+        {"Name": "JazzMe", "User":"admin", "Password": "admin", "Genre":"Jazz", 
             "Description": "Indie jazz radio station, Online cast", "BitRate":128, "BurstSize": 65535, "DumpFile": ""
         }
     ]
