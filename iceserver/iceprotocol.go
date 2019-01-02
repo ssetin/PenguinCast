@@ -2,7 +2,7 @@ package iceserver
 
 /*
 	TODO:
-	- icecast-style meta info
+	- writeMount security issue
 */
 
 import (
@@ -37,8 +37,8 @@ func getHost(addr string) string {
 //223.33.152.54 - - [27/Feb/2012:13:37:21 +0300] "GET /gop_aac HTTP/1.1" 200 75638 "-" "WMPlayer/10.0.0.364 guid/3300AD50-2C39-46C0-AE0A-AC7B8159E203" 400
 func (i *IceServer) closeMount(idx int, issource bool, bytessended *int, start time.Time, r *http.Request) {
 	if issource {
-		i.Props.Mounts[idx].Clear()
 		i.decSources()
+		i.Props.Mounts[idx].Clear()
 	} else {
 		i.Props.Mounts[idx].decListeners()
 		i.decListeners()
@@ -127,6 +127,8 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	flusher, _ := w.(http.Flusher)
 
 	pack = mount.buffer.First()
+	//try to maximize unused buffer pages from begining
+	//pack = mount.buffer.Start()
 
 	if pack == nil {
 		i.printError(1, "readMount Empty buffer")
@@ -281,7 +283,6 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		}
 
 		time.Sleep(1000 * time.Millisecond)
-		//mount.buffer.Print()
 
 		//check if maxbuffersize reached and truncate it
 		mount.buffer.checkAndTruncate()

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+  <head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />	
+	<link rel="stylesheet" type="text/css" href="/style.css" />
+	<link rel="shortcut icon" type="image/x-icon" href="/img/penguin.png" />
+	<title>{{.Props.Name}} Monitor</title>
+
+	<script type="text/javascript">
+  		function drawBuffer(str){
+			var i=0;
+			var result="";
+			for (i=0;i<str.length;i++){
+				if(str[i]==1){
+					result+= "<span style='color:green'>█</span>"
+				} else {
+					result+= "<span style='color:red'>░</span>"
+				}
+			}
+			return result;  			
+		}
+	</script>
+  </head>
+  <body>
+		<script>			
+			function updateMonitor(msg) {        			
+				var idx;
+				for (idx = 0; idx < msg.Mounts.length; idx++) {
+					var Listeners = document.getElementById(msg.Mounts[idx].Name+".Listeners");
+					Listeners.textContent = msg.Mounts[idx].Listeners;
+					var bufferSize = document.getElementById(msg.Mounts[idx].Name+".Size");
+					bufferSize.textContent = msg.Mounts[idx].Buff.Size;
+					var InUse = document.getElementById(msg.Mounts[idx].Name+".InUse");
+					InUse.textContent = msg.Mounts[idx].Buff.InUse;
+					var SizeBytes = document.getElementById(msg.Mounts[idx].Name+".SizeBytes");
+					SizeBytes.textContent = Math.floor(msg.Mounts[idx].Buff.SizeBytes/1024);
+					var Graph = document.getElementById(msg.Mounts[idx].Name+".Graph");
+					Graph.innerHTML = drawBuffer(msg.Mounts[idx].Buff.Graph);
+				}
+			}
+				
+			conn = new WebSocket("ws://127.0.0.1:{{.Props.Socket.Port}}/updateMonitor");
+			conn.onmessage = function (event) {
+				updateMonitor(JSON.parse(event.data));
+			};
+		</script>
+	<div>
+	    <img src="/img/penguin.png" class="left"/>
+		<h1 class="left mainheader">PenguinCast Monitor</h1>
+	</div><div class="clear"></div>
+		<div id="monContainer">
+				{{range .Props.Mounts}}
+				<table class="greyGridTable">
+					<tr>
+						<th><h3>{{.Name}}</h3></th>
+						<th></th>
+					</tr>
+					<tr>
+						<td>Listeners:</td>
+						<td id="{{.Name}}.Listeners"></td>
+					</tr>
+					<tr>
+						<td>Buffer Size, pages:</td>
+						<td id="{{.Name}}.Size"></td>
+					</tr>
+					<tr>
+						<td>Buffer Used, pages:</td>
+						<td id="{{.Name}}.InUse"></td>
+					</tr>
+					<tr>
+						<td>Buffer Size, Kb:</td>
+						<td id="{{.Name}}.SizeBytes"></td>
+					</tr>
+					<tr>
+						<td>Buffer, graph:</td>
+						<td id="{{.Name}}.Graph"></td>
+					</tr>					
+				</table>
+				{{end}}
+		</div>
+	<div id="footer">
+		admin: <a href="mailto:{{.Props.Admin}}">{{.Props.Admin}}</a>, location: {{.Props.Location}}<br/>
+		No support, just take fun with radio<br/>
+		* inspired by the icecast
+	</div>
+	</body>
+</html>

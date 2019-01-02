@@ -22,6 +22,13 @@ type MetaData struct {
 	StreamTitle string
 }
 
+// MountInfo ...
+type MountInfo struct {
+	Name      string
+	Listeners int
+	Buff      BufferInfo
+}
+
 // Mount ...
 type Mount struct {
 	Name         string `json:"Name"`
@@ -54,7 +61,7 @@ func (m *Mount) Init(srv *IceServer) error {
 	m.Server = srv
 	m.Clear()
 	m.State.MetaInfo.MetaInt = m.BitRate * 1024 / 8 * 10
-	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8) + 5)
+	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8) + 10)
 	if m.DumpFile > "" {
 		var err error
 		m.dumpFile, err = os.OpenFile(srv.Props.Paths.Log+m.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
@@ -193,6 +200,16 @@ func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m.State.MetaInfo.StreamTitle = string(result[:])
+}
+
+func (m *Mount) getMountsInfo() MountInfo {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	var t MountInfo
+	t.Name = m.Name
+	t.Listeners = m.State.Listeners
+	t.Buff = m.buffer.Info()
+	return t
 }
 
 // icy style metadata

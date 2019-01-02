@@ -34,8 +34,9 @@ type Properties struct {
 	} `json:"Paths"`
 
 	Logging struct {
-		Loglevel int `json:"Loglevel"`
-		Logsize  int `json:"Logsize"`
+		Loglevel   int  `json:"Loglevel"`
+		Logsize    int  `json:"Logsize"`
+		UseMonitor bool `json:"UseMonitor"`
 	} `json:"Logging"`
 
 	Mounts []Mount `json:"Mounts"`

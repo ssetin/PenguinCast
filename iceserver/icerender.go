@@ -29,6 +29,10 @@ func (i *IceServer) renderMounts(w http.ResponseWriter, r *http.Request, tplname
 		i.setInternal(w, r)
 		return
 	}
+	// race on template Execute issue
+	i.mux.Lock()
+	defer i.mux.Unlock()
+
 	err = t.Execute(w, &i)
 	if err != nil {
 		i.printError(1, err.Error())

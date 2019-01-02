@@ -13,7 +13,7 @@ import (
 
 const (
 	cServerName = "PenguinCast"
-	cVersion    = "0.06d"
+	cVersion    = "0.06dev"
 )
 
 var (
@@ -185,7 +185,7 @@ func (i *IceServer) handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.HasSuffix(page, "info.html") || strings.HasSuffix(page, "info.json") {
+	if strings.HasSuffix(page, "info.html") || strings.HasSuffix(page, "info.json") || strings.HasSuffix(page, "monitor.html") {
 		i.renderMounts(w, r, page)
 	} else {
 		http.ServeFile(w, r, page)
@@ -210,7 +210,18 @@ func (i *IceServer) runCommand(idx int, w http.ResponseWriter, r *http.Request) 
 /*Start - start listening port ...*/
 func (i *IceServer) Start() {
 	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt)
+	signal.Notify(stop, os.Interrupt, os.Kill)
+
+	if i.Props.Logging.UseMonitor {
+		//http.HandleFunc("/monitor", i.handleMonitor)
+		http.HandleFunc("/updateMonitor", func(w http.ResponseWriter, r *http.Request) {
+			ws, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				log.Fatal(err)
+			}
+			go i.sendMonitorInfo(ws)
+		})
+	}
 
 	http.HandleFunc("/", i.handler)
 

@@ -2,3 +2,5 @@ debug
 result
 *.mp3
 *.sh
+*.out
+*.test

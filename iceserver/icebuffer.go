@@ -2,15 +2,13 @@ package iceserver
 
 /*
 	TODO:
-	- manage buffer size
 */
 
 import (
-	"log"
 	"sync"
 )
 
-//BufElement ...
+//BufElement - kind of buffer page
 type BufElement struct {
 	locked bool
 	buffer []byte
@@ -18,15 +16,24 @@ type BufElement struct {
 	mux    sync.Mutex
 }
 
-// BufferQueue ...
+// BufferQueue - queue, which stores stream fragments from SOURCE
 type BufferQueue struct {
 	mux           sync.Mutex
 	size          int
 	maxBufferSize int
+	minBufferSize int
 	first, last   *BufElement
 }
 
-// NewbufElement ...
+// BufferInfo - struct for monitoring
+type BufferInfo struct {
+	Size      int
+	SizeBytes int
+	Graph     string
+	InUse     int
+}
+
+// NewbufElement - returns new buffer element (page)
 func NewbufElement() *BufElement {
 	var t *BufElement
 	t = &BufElement{locked: false}
@@ -63,25 +70,27 @@ func (q *BufElement) IsLocked() bool {
 
 //***************************************
 
-//Init ...
+//Init - initiates buffer queue
 func (q *BufferQueue) Init(maxsize int) {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	q.size = 0
 	q.maxBufferSize = maxsize
+	q.minBufferSize = 10
 	q.first = nil
 	q.last = nil
 }
 
-//Size ...
+//Size - returns buffer queue size
 func (q *BufferQueue) Size() int {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	return q.size
 }
 
-//Print ...
-func (q *BufferQueue) Print() {
+// Info - returns buffer state
+func (q *BufferQueue) Info() BufferInfo {
+	var result BufferInfo
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	var t *BufElement
@@ -92,31 +101,69 @@ func (q *BufferQueue) Print() {
 		if t == nil {
 			break
 		}
+		result.Size++
+		result.SizeBytes += len(t.buffer)
+
 		if t.IsLocked() {
 			str = str + "1"
+			result.InUse++
 		} else {
 			str = str + "0"
 		}
 		t = t.next
 	}
-	log.Println("Buffer: " + str)
+
+	result.Graph = str
+
+	return result
 }
 
-//First ...
+//First - returns the first element in buffer queue
 func (q *BufferQueue) First() *BufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	return q.first
 }
 
-//Last ...
+//Last - returns the last element in buffer queue
 func (q *BufferQueue) Last() *BufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	return q.last
 }
 
-//checkAndTruncate ...
+//Start - returns the element to start with
+func (q *BufferQueue) Start() *BufElement {
+	q.mux.Lock()
+	defer q.mux.Unlock()
+
+	countBeforeLast := 5
+
+	var t, tnext *BufElement
+	t = q.first
+	if t == nil {
+		return nil
+	}
+
+	for {
+		if t.next == nil {
+			break
+		}
+		tnext = t
+		for i := 0; i < countBeforeLast; i++ {
+			tnext = tnext.next
+			if tnext == nil {
+				return t
+			}
+		}
+		t = t.next
+	}
+
+	return t
+}
+
+// checkAndTruncate - check if the max buffer size is reached and try to truncate it
+// taking into account pages, which still in use
 func (q *BufferQueue) checkAndTruncate() {
 	if q.Size() < q.maxBufferSize {
 		return
@@ -135,6 +182,9 @@ func (q *BufferQueue) checkAndTruncate() {
 			break
 		} else {
 			if t.next != nil {
+				if q.size <= q.minBufferSize {
+					break
+				}
 				q.first = t.next
 				q.size--
 			} else {
@@ -146,7 +196,7 @@ func (q *BufferQueue) checkAndTruncate() {
 
 }
 
-//Append ...
+//Append - appends new page to the end of the buffer queue
 func (q *BufferQueue) Append(buffer []byte, readed int) {
 	var t *BufElement
 	t = NewbufElement()

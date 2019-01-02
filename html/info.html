@@ -57,8 +57,10 @@
 			</table>
 			{{end}}
 		</div>
-	</div>
 	<div id="footer">
+		{{ if .Props.Logging.UseMonitor }}
+		<a href="/monitor.html">Monitor</a><br/>
+		{{ end }}
 		admin: <a href="mailto:{{.Props.Admin}}">{{.Props.Admin}}</a>, location: {{.Props.Location}}<br/>
 		No support, just take fun with radio<br/>
 		* inspired by the icecast
