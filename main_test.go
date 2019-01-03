@@ -7,20 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ssetin/PenguinCast/iceserver"
 	"github.com/ssetin/PenguinCast/penguinClient"
 )
 
 // ================================== Setup ========================================
 const (
-	listenersCount = 700 // total number of listeners
-	incStep        = 10  // number of listeners, to increase with each step
-	waitStep       = 10  // seconds between each step
-	secToListen    = 300 // seconds to listen by each connection
+	listenersCount = 5000 // total number of listeners
+	incStep        = 10   // number of listeners, to increase with each step
+	waitStep       = 10   // seconds between each step
+	secToListen    = 5400 // seconds to listen by each connection
 	mountName      = "RockRadio96"
 	hostAddr       = "127.0.0.1:8008"
 )
 
+/*
 var IcySrv iceserver.IceServer
 
 func startServer() {
@@ -32,19 +32,21 @@ func startServer() {
 	}
 	IcySrv.Start()
 }
+*/
 
 // ================================== Benchmarks ===========================================
 
-func BenchmarkListenersCount(b *testing.B) {
-	go startServer()
-
-	time.Sleep(time.Second * 2)
-	log.Println("Waiting for SOURCE to connect...")
-	time.Sleep(time.Second * 10)
+func BenchmarkListeners(b *testing.B) {
+	// run server in another process to monitor it separately from clients
+	/*
+		go startServer()
+		time.Sleep(time.Second * 2)
+		log.Println("Waiting for SOURCE to connect...")
+		time.Sleep(time.Second * 10)
+	*/
 	log.Println("Start creating listeners...")
 
 	wg := &sync.WaitGroup{}
-	b.ResetTimer()
 
 	for i := 0; i < listenersCount/incStep; i++ {
 		wg.Add(incStep)
@@ -72,7 +74,7 @@ func BenchmarkListenersCount(b *testing.B) {
 }
 
 /*
-	go test -race -bench . -benchmem -timeout 30m main_test.go
-	go test -bench . -benchmem -cpuprofile=cpu.out -memprofile=mem.out -timeout 30m main_test.go
+	go test -race -bench . -benchmem -timeout 300m main_test.go
+	go test -bench . -benchmem -cpuprofile=cpu.out -memprofile=mem.out -timeout 300m main_test.go
 	mp3check -e -a -S -T -E -v dump/*.mp3
 */

@@ -3,6 +3,7 @@ package penguinClient
 import (
 	"bufio"
 	"errors"
+	"log"
 	"net"
 	"net/textproto"
 	"os"
@@ -17,6 +18,7 @@ const (
 	cVersion    = "0.1"
 )
 
+// PenguinClient ...
 type PenguinClient struct {
 	urlMount     string
 	host         string
@@ -27,6 +29,7 @@ type PenguinClient struct {
 	conn         net.Conn
 }
 
+// Init - initialize client
 func (p *PenguinClient) Init(host string, mount string, dump string) error {
 	p.urlMount = "http://" + host + "/" + mount
 	p.host = host
@@ -64,23 +67,25 @@ func (p *PenguinClient) getMountInfo() error {
 		if err != nil {
 			return err
 		}
-		if line == "\r\n" || line == "\n" {
+		if line == "" {
 			break
 		}
 		params := strings.Split(line, ":")
 		if len(params) == 2 {
-			if params[0] == "x-audiocast-bitrate" {
-				p.bitRate, err = strconv.Atoi(params[1])
+			if params[0] == "X-Audiocast-Bitrate" {
+				p.bitRate, err = strconv.Atoi(strings.TrimSpace(params[1]))
 				if err != nil {
 					return err
 				}
 			}
 		}
+
 	}
 
 	return nil
 }
 
+// Listen - start to listen the stream during secToListen seconds
 func (p *PenguinClient) Listen(secToListen int) error {
 	var err error
 	p.conn, err = net.Dial("tcp", p.host)
@@ -99,6 +104,7 @@ func (p *PenguinClient) Listen(secToListen int) error {
 
 	err = p.getMountInfo()
 	if err != nil {
+		log.Println(err.Error())
 		return err
 	}
 

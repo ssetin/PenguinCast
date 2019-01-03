@@ -9,6 +9,7 @@ Icecast compatible streaming audio server, which can be used as a server part of
 * Operating with shoutcast metadata
 * Collecting statistics at access.log
 * Html and json interface for accessing server status (__http://host:port/info.html__ and __http://host:port/info.json__)
+* Real time monitoring (__http://host:port/monitor.html__)
 
 ## Configuring
 Configuration parameters are stored in config.json.
@@ -26,7 +27,7 @@ Configuration parameters are stored in config.json.
     },
     "Auth": {"AdminPassword": "admin"},
     "Paths": {"Log": "log/", "Web":"html/"},
-    "Logging": {"Loglevel": 4, "Logsize": 50000},
+    "Logging": {"Loglevel": 4, "Logsize": 50000, "UseMonitor": true, "UseStat": true},
     "Mounts": [
         {
             "Name": "RockRadio96", "User":"admin", "Password": "admin", "Genre":"Rock", 

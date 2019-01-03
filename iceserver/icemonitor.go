@@ -25,7 +25,7 @@ var upgrader = websocket.Upgrader{
 }
 
 func (i *IceServer) processStats() {
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	for {
 		sysInfo, err := pidusage.GetStat(os.Getpid())
 		if err != nil {
@@ -43,7 +43,7 @@ func (i *IceServer) processStats() {
 }
 
 func (i *IceServer) sendMonitorInfo(client *websocket.Conn) {
-	ticker := time.NewTicker(4 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	for {
 		w, err := client.NextWriter(websocket.TextMessage)
 		if err != nil {
