@@ -14,8 +14,8 @@ import (
 // ================================== Setup ========================================
 const (
 	listenersCount = 700 // total number of listeners
-	incStep        = 50  // number of listeners, to increase with each step
-	waitStep       = 5   // seconds between each step
+	incStep        = 10  // number of listeners, to increase with each step
+	waitStep       = 10  // seconds between each step
 	secToListen    = 300 // seconds to listen by each connection
 	mountName      = "RockRadio96"
 	hostAddr       = "127.0.0.1:8008"
@@ -36,7 +36,6 @@ func startServer() {
 // ================================== Benchmarks ===========================================
 
 func BenchmarkListenersCount(b *testing.B) {
-	//b.StopTimer()
 	go startServer()
 
 	time.Sleep(time.Second * 2)
@@ -45,7 +44,7 @@ func BenchmarkListenersCount(b *testing.B) {
 	log.Println("Start creating listeners...")
 
 	wg := &sync.WaitGroup{}
-	//b.StartTimer()
+	b.ResetTimer()
 
 	for i := 0; i < listenersCount/incStep; i++ {
 		wg.Add(incStep)
@@ -73,7 +72,7 @@ func BenchmarkListenersCount(b *testing.B) {
 }
 
 /*
-	go test -race -bench . -benchmem main_test.go
-	go test -bench . -benchmem -cpuprofile=cpu.out -memprofile=mem.out main_test.go
+	go test -race -bench . -benchmem -timeout 30m main_test.go
+	go test -bench . -benchmem -cpuprofile=cpu.out -memprofile=mem.out -timeout 30m main_test.go
 	mp3check -e -a -S -T -E -v dump/*.mp3
 */

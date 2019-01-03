@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -28,6 +29,8 @@ type IceServer struct {
 	Props Properties
 
 	mux            sync.Mutex
+	Started        bool
+	StartedTime    time.Time
 	ListenersCount int
 	SourcesCount   int
 
@@ -47,8 +50,9 @@ func (i *IceServer) Init() error {
 
 	i.ListenersCount = 0
 	i.SourcesCount = 0
+	i.Started = false
 
-	log.Println("Starting " + i.serverName + " " + i.version)
+	log.Println("Init " + i.serverName + " " + i.version)
 
 	err = i.initConfig()
 	if err != nil {
@@ -138,7 +142,7 @@ func (i *IceServer) Close() {
 	for idx := range i.Props.Mounts {
 		i.Props.Mounts[idx].Close()
 	}
-	log.Println("Ok!")
+	log.Println("Stopped")
 }
 
 func (i *IceServer) checkIsMount(page string) int {
@@ -195,7 +199,7 @@ func (i *IceServer) handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.HasSuffix(page, "info.html") || strings.HasSuffix(page, "info.json") || strings.HasSuffix(page, "monitor.html") {
-		i.renderMounts(w, r, page)
+		i.renderPage(w, r, page)
 	} else {
 		http.ServeFile(w, r, page)
 	}
@@ -218,11 +222,17 @@ func (i *IceServer) runCommand(idx int, w http.ResponseWriter, r *http.Request) 
 
 /*Start - start listening port ...*/
 func (i *IceServer) Start() {
+	i.mux.Lock()
+	if i.Started {
+		i.mux.Unlock()
+		return
+	}
+	i.mux.Unlock()
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, os.Kill)
 
 	if i.Props.Logging.UseMonitor {
-		//http.HandleFunc("/monitor", i.handleMonitor)
 		http.HandleFunc("/updateMonitor", func(w http.ResponseWriter, r *http.Request) {
 			ws, err := upgrader.Upgrade(w, r, nil)
 			if err != nil {
@@ -235,8 +245,16 @@ func (i *IceServer) Start() {
 	http.HandleFunc("/", i.handler)
 
 	go func() {
+		i.mux.Lock()
+		i.Started = true
+		i.StartedTime = time.Now()
+		i.mux.Unlock()
+		log.Print("Started")
 		log.Fatal(http.ListenAndServe(":"+strconv.Itoa(i.Props.Socket.Port), nil))
 	}()
 
 	<-stop
+	i.mux.Lock()
+	i.Started = false
+	i.mux.Unlock()
 }

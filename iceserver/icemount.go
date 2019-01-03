@@ -3,6 +3,7 @@ package iceserver
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/transform"
@@ -26,6 +28,7 @@ type MetaData struct {
 type MountInfo struct {
 	Name      string
 	Listeners int
+	UpTime    string
 	Buff      BufferInfo
 }
 
@@ -44,10 +47,10 @@ type Mount struct {
 	MaxListeners int    `json:"MaxListeners"`
 
 	State struct {
-		Status    string
-		Started   string
-		MetaInfo  MetaData
-		Listeners int
+		Started     bool
+		StartedTime time.Time
+		MetaInfo    MetaData
+		Listeners   int
 	} `json:"-"`
 
 	mux      sync.Mutex
@@ -83,8 +86,8 @@ func (m *Mount) Close() {
 func (m *Mount) Clear() {
 	m.mux.Lock()
 	defer m.mux.Unlock()
-	m.State.Status = "Offline"
-	m.State.Started = ""
+	m.State.Started = false
+	m.State.StartedTime = time.Time{}
 	m.zeroListeners()
 	m.State.MetaInfo.StreamTitle = ""
 	m.StreamURL = m.Server.Props.Host + ":" + strconv.Itoa(m.Server.Props.Socket.Port) + "/" + m.Name
@@ -176,7 +179,6 @@ func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
 
 	m.Genre = r.Header.Get("ice-genre")
 	m.ContentType = r.Header.Get("content-type")
-	//m.StreamURL = r.Header.Get("ice-url")
 	m.Description = r.Header.Get("ice-description")
 }
 
@@ -202,12 +204,25 @@ func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
 	m.State.MetaInfo.StreamTitle = string(result[:])
 }
 
+func fmtDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+	h := d / time.Hour
+	d -= h * time.Hour
+	m := d / time.Minute
+	d -= m * time.Minute
+	s := int(d.Seconds())
+	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
+}
+
 func (m *Mount) getMountsInfo() MountInfo {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	var t MountInfo
 	t.Name = m.Name
 	t.Listeners = m.State.Listeners
+	if m.State.Started {
+		t.UpTime = fmtDuration(time.Since(m.State.StartedTime))
+	}
 	t.Buff = m.buffer.Info()
 	return t
 }

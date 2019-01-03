@@ -26,6 +26,8 @@
 			function updateMonitor(msg) {        			
 				var idx;
 				for (idx = 0; idx < msg.Mounts.length; idx++) {
+					var UpTime = document.getElementById(msg.Mounts[idx].Name+".UpTime");
+					UpTime.textContent = msg.Mounts[idx].UpTime;
 					var Listeners = document.getElementById(msg.Mounts[idx].Name+".Listeners");
 					Listeners.textContent = msg.Mounts[idx].Listeners;
 					var bufferSize = document.getElementById(msg.Mounts[idx].Name+".Size");
@@ -56,19 +58,23 @@
 						<th></th>
 					</tr>
 					<tr>
+						<td>Uptime:</td>
+						<td id="{{.Name}}.UpTime"></td>
+					</tr>
+					<tr>
 						<td>Listeners:</td>
 						<td id="{{.Name}}.Listeners"></td>
 					</tr>
 					<tr>
-						<td>Buffer Size, pages:</td>
+						<td>Buffer size, pages:</td>
 						<td id="{{.Name}}.Size"></td>
 					</tr>
 					<tr>
-						<td>Buffer Used, pages:</td>
+						<td>Buffer used, pages:</td>
 						<td id="{{.Name}}.InUse"></td>
 					</tr>
 					<tr>
-						<td>Buffer Size, Kb:</td>
+						<td>Buffer size, Kb:</td>
 						<td id="{{.Name}}.SizeBytes"></td>
 					</tr>
 					<tr>
@@ -79,6 +85,7 @@
 				{{end}}
 		</div>
 	<div id="footer">
+		Started at {{.StartedTime.Format "Jan 02, 2006 15:04:05"}}<br/>
 		admin: <a href="mailto:{{.Props.Admin}}">{{.Props.Admin}}</a>, location: {{.Props.Location}}<br/>
 		No support, just take fun with radio<br/>
 		* inspired by the icecast

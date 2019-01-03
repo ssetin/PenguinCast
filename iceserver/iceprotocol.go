@@ -219,7 +219,7 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 	mount = &i.Props.Mounts[idx]
 
 	mount.mux.Lock()
-	if mount.State.Status != "On air" {
+	if !mount.State.Started {
 		err := mount.auth(w, r)
 		if err != nil {
 			mount.mux.Unlock()
@@ -227,8 +227,8 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		mount.writeICEHeaders(w, r)
-		mount.State.Status = "On air"
-		mount.State.Started = time.Now().Format(time.RFC1123Z)
+		mount.State.Started = true
+		mount.State.StartedTime = time.Now()
 	}
 	mount.mux.Unlock()
 

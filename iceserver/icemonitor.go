@@ -35,7 +35,7 @@ func (i *IceServer) processStats() {
 		}
 		i.mux.Lock()
 		if i.ListenersCount > 0 {
-			fmt.Fprintf(i.statFile, time.Now().Format(time.RFC3339)+"\t%d\t%f\t%f\n", i.ListenersCount, sysInfo.CPU, sysInfo.Memory/1024)
+			fmt.Fprintf(i.statFile, time.Now().Format("2006-01-02 15:04:05")+"\t%d\t%f\t%f\n", i.ListenersCount, sysInfo.CPU, sysInfo.Memory/1024)
 		}
 		i.mux.Unlock()
 		<-ticker.C

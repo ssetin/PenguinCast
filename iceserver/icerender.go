@@ -22,18 +22,14 @@ func (i *IceServer) setInternal(w http.ResponseWriter, r *http.Request) {
 	w.Write(f)
 }
 
-func (i *IceServer) renderMounts(w http.ResponseWriter, r *http.Request, tplname string) {
+func (i *IceServer) renderPage(w http.ResponseWriter, r *http.Request, tplname string) {
 	t, err := template.ParseFiles(tplname)
 	if err != nil {
 		i.printError(1, err.Error())
 		i.setInternal(w, r)
 		return
 	}
-	// race on template Execute issue
-	i.mux.Lock()
-	defer i.mux.Unlock()
-
-	err = t.Execute(w, &i)
+	err = t.Execute(w, i)
 	if err != nil {
 		i.printError(1, err.Error())
 		i.setInternal(w, r)

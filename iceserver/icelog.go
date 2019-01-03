@@ -24,7 +24,7 @@ func (i *IceServer) initLog() error {
 	}
 
 	if i.Props.Logging.UseStat {
-		i.statFile, err = os.OpenFile(i.Props.Paths.Log+"stat.log", os.O_CREATE|os.O_WRONLY, 0666)
+		i.statFile, err = os.OpenFile(i.Props.Paths.Log+"stat.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
 		if err != nil {
 			return err
 		}
