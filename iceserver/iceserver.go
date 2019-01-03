@@ -35,6 +35,7 @@ type IceServer struct {
 	logErrorFile  *os.File
 	logAccess     *log.Logger
 	logAccessFile *os.File
+	statFile      *os.File
 }
 
 // Init - Load params from config.json
@@ -61,6 +62,11 @@ func (i *IceServer) Init() error {
 	if err != nil {
 		return err
 	}
+
+	if i.Props.Logging.UseStat {
+		go i.processStats()
+	}
+
 	return nil
 }
 
@@ -126,6 +132,9 @@ func (i *IceServer) Close() {
 	log.Print("Stopping " + i.serverName + "...")
 	i.logErrorFile.Close()
 	i.logAccessFile.Close()
+	if i.statFile != nil {
+		i.statFile.Close()
+	}
 	for idx := range i.Props.Mounts {
 		i.Props.Mounts[idx].Close()
 	}

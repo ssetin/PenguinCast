@@ -2,10 +2,13 @@ package iceserver
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/struCoder/pidusage"
 )
 
 //MonitorInfo ...
@@ -19,6 +22,24 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
+}
+
+func (i *IceServer) processStats() {
+	ticker := time.NewTicker(3 * time.Second)
+	for {
+		sysInfo, err := pidusage.GetStat(os.Getpid())
+		if err != nil {
+			i.printError(1, err.Error())
+			ticker.Stop()
+			break
+		}
+		i.mux.Lock()
+		if i.ListenersCount > 0 {
+			fmt.Fprintf(i.statFile, time.Now().Format(time.RFC3339)+"\t%d\t%f\t%f\n", i.ListenersCount, sysInfo.CPU, sysInfo.Memory/1024)
+		}
+		i.mux.Unlock()
+		<-ticker.C
+	}
 }
 
 func (i *IceServer) sendMonitorInfo(client *websocket.Conn) {

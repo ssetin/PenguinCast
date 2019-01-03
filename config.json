@@ -7,7 +7,7 @@
     "Limits": {"Clients": 100000, "Sources": 5, "SourceIdleTimeOut": 5,"EmptyBufferIdleTimeOut": 5},
     "Auth": {"AdminPassword": "admin"},
     "Paths": {"Log": "log/", "Web":"html/"},
-    "Logging": {"Loglevel": 2, "Logsize": 50000, "UseMonitor": true},
+    "Logging": {"Loglevel": 2, "Logsize": 50000, "UseMonitor": true, "UseStat": true},
     "Mounts": [
         {"Name": "RockRadio96", "User":"admin", "Password": "admin", "Genre":"Rock", 
             "Description": "Rock radio station, Saint Petersburg", "BitRate":96, "BurstSize": 65535, "DumpFile": "rock96.mp3"

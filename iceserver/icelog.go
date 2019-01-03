@@ -1,6 +1,7 @@
 package iceserver
 
 import (
+	"fmt"
 	"log"
 	"os"
 )
@@ -20,6 +21,14 @@ func (i *IceServer) initLog() error {
 	i.logAccessFile, err = os.OpenFile(i.Props.Paths.Log+"access.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		return err
+	}
+
+	if i.Props.Logging.UseStat {
+		i.statFile, err = os.OpenFile(i.Props.Paths.Log+"stat.log", os.O_CREATE|os.O_WRONLY, 0666)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(i.statFile, "#Time	#Listeners	#CpuUsage	#MemUsage")
 	}
 
 	i.logError = log.New(i.logErrorFile, "", log.Ldate|log.Ltime)
