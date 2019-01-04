@@ -41,7 +41,7 @@
 				}
 			}
 				
-			conn = new WebSocket("ws://127.0.0.1:{{.Props.Socket.Port}}/updateMonitor");
+			conn = new WebSocket("ws://{{.Props.Host}}:{{.Props.Socket.Port}}/updateMonitor");
 			conn.onmessage = function (event) {
 				updateMonitor(JSON.parse(event.data));
 			};

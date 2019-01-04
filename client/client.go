@@ -1,4 +1,7 @@
-package penguinClient
+// Package iceclient - simple client for icecast server
+// Copyright 2019 Setin Sergei
+// Licensed under the Apache License, Version 2.0 (the "License")
+package iceclient
 
 import (
 	"bufio"
@@ -126,7 +129,7 @@ func (p *PenguinClient) Listen(secToListen int) error {
 			p.dumpFile.Write(sndBuff[:n])
 		}
 		readedBytes += n
-		time.Sleep(time.Millisecond * 300)
+		time.Sleep(time.Millisecond * 100)
 	}
 
 	return nil

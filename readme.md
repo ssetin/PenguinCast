@@ -1,15 +1,14 @@
 # PenguinCast
-Under construction
+In the development process, still a lot of work
 
-Icecast compatible streaming audio server, which can be used as a server part of your internet radio station.
+Icecast compatible streaming audio server - server part of your internet radio station.
 
 ## Capabilities
-* Recieving stream from Source
-* Sending stream to clients
+* Receiving stream from Source and sending it to Clients
 * Operating with shoutcast metadata
-* Collecting statistics at access.log
+* Collect and save listening statistics in the access.log file
 * Html and json interface for accessing server status (__http://host:port/info.html__ and __http://host:port/info.json__)
-* Real time monitoring (__http://host:port/monitor.html__)
+* Real time server state monitoring (__http://host:port/monitor.html__)
 
 ## Configuring
 Configuration parameters are stored in config.json.
@@ -19,7 +18,7 @@ Configuration parameters are stored in config.json.
     "Name": "Rollstation radio",
     "Admin": "admin@site.com",
     "Location": "Saint Petersburg",
-    "Host": "http://127.0.0.1",
+    "Host": "127.0.0.1",
     "Socket": { "Port": 8008},
     "Limits": {
         "Clients": 30, "Sources": 5, 
@@ -27,7 +26,11 @@ Configuration parameters are stored in config.json.
     },
     "Auth": {"AdminPassword": "admin"},
     "Paths": {"Log": "log/", "Web":"html/"},
-    "Logging": {"Loglevel": 4, "Logsize": 50000, "UseMonitor": true, "UseStat": true},
+    "Logging": {
+        "Loglevel": 4,
+        "Logsize": 50000,
+        "UseMonitor": true,
+        "UseStat": true},
     "Mounts": [
         {
             "Name": "RockRadio96", "User":"admin", "Password": "admin", "Genre":"Rock", 
@@ -63,3 +66,9 @@ Configuration parameters are stored in config.json.
     - 2 - Warning
     - 3 - Info
     - 4 - Debug
+- UseMonitor - activate online monitoring of server state
+- UseStat - collect and save listeners count, cpu and memory usage to file log/stat.log
+
+
+## Load testing
+soon

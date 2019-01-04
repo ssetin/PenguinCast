@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/ssetin/PenguinCast/iceserver"
+	"github.com/ssetin/PenguinCast/server"
 )
 
 func main() {

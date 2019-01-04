@@ -1,3 +1,6 @@
+// Package iceserver - icecast streaming server
+// Copyright 2018 Setin Sergei
+// Licensed under the Apache License, Version 2.0 (the "License")
 package iceserver
 
 import (
@@ -43,7 +46,7 @@ func (i *IceServer) processStats() {
 }
 
 func (i *IceServer) sendMonitorInfo(client *websocket.Conn) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(7 * time.Second)
 	for {
 		w, err := client.NextWriter(websocket.TextMessage)
 		if err != nil {

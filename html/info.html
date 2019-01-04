@@ -48,7 +48,7 @@
 				</tr>
 				<tr>
 					<td>Stream URL:</td>
-					<td><a href="{{.StreamURL}}">{{.StreamURL}}</a></td>
+					<td><a href="{{.StreamURL}}" target="_blank">{{.StreamURL}}</a></td>
 				</tr>
 				<tr>
 					<td>Currently playing:</td>
@@ -59,7 +59,7 @@
 		</div>
 	<div id="footer">
 		{{ if .Props.Logging.UseMonitor }}
-		<a href="/monitor.html">Monitor</a><br/>
+		<a href="/monitor.html" target="_blank">Monitor</a><br/>
 		{{ end }}
 		Started at {{.StartedTime.Format "Jan 02, 2006 15:04:05"}}<br/>
 		admin: <a href="mailto:{{.Props.Admin}}">{{.Props.Admin}}</a>, location: {{.Props.Location}}<br/>

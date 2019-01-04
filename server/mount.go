@@ -1,3 +1,6 @@
+// Package iceserver - icecast streaming server
+// Copyright 2018 Setin Sergei
+// Licensed under the Apache License, Version 2.0 (the "License")
 package iceserver
 
 import (
@@ -90,7 +93,7 @@ func (m *Mount) Clear() {
 	m.State.StartedTime = time.Time{}
 	m.zeroListeners()
 	m.State.MetaInfo.StreamTitle = ""
-	m.StreamURL = m.Server.Props.Host + ":" + strconv.Itoa(m.Server.Props.Socket.Port) + "/" + m.Name
+	m.StreamURL = "http://" + m.Server.Props.Host + ":" + strconv.Itoa(m.Server.Props.Socket.Port) + "/" + m.Name
 }
 
 func (m *Mount) incListeners() {
