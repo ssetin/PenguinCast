@@ -20,7 +20,7 @@ set style line 3 lw 2 lt 1 lc 2
 
 # Memory
 set ylabel "Listeners"
-set yrange [0:50000]
+set yrange [0:10000]
 set ytics nomirror
 
 # CPU

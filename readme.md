@@ -6,7 +6,7 @@ Icecast compatible streaming audio server - server part of your internet radio s
 ## Capabilities
 * Receiving stream from Source and sending it to Clients
 * Operating with shoutcast metadata
-* Collect and save listening statistics in the access.log file
+* Collecting and saving listening statistics to access.log file
 * Html and json interface for accessing server status (__http://host:port/info.html__ and __http://host:port/info.json__)
 * Real time server state monitoring (__http://host:port/monitor.html__)
 

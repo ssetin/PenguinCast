@@ -2,7 +2,7 @@
     "Name": "Rollstation radio",
     "Admin": "admin@site.com",
     "Location": "Saint Petersburg",
-    "Host": "192.168.10.229",
+    "Host": "192.168.10.2",
     "Socket": { "Port": 8008},
     "Limits": {"Clients": 100000, "Sources": 5, "SourceIdleTimeOut": 10,"EmptyBufferIdleTimeOut": 10},
     "Auth": {"AdminPassword": "admin"},

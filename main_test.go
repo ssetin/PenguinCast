@@ -6,17 +6,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ssetin/PenguinCast/penguinClient"
+	"github.com/ssetin/PenguinCast/src/client"
 )
 
 // ================================== Setup ========================================
 const (
-	listenersCount = 10000 // total number of listeners
-	incStep        = 30    // number of listeners, to increase with each step
-	waitStep       = 5     // seconds between each step
-	secToListen    = 5400  // seconds to listen by each connection
+	listenersCount = 6000 // total number of listeners
+	incStep        = 25   // number of listeners, to increase with each step
+	waitStep       = 5    // seconds between each step
+	secToListen    = 5400 // seconds to listen by each connection
 	mountName      = "RockRadio96"
-	hostAddr       = "127.0.0.1:8008"
+	hostAddr       = "192.168.10.2:8008"
 )
 
 /*
@@ -53,7 +53,7 @@ func BenchmarkListenersCount(b *testing.B) {
 			go func(wg *sync.WaitGroup, i int) {
 				defer wg.Done()
 				time.Sleep(time.Millisecond * 200)
-				cl := &penguinClient.PenguinClient{}
+				cl := &iceclient.PenguinClient{}
 				//if i < 30 {
 				//	cl.Init(hostAddr, mountName, "dump/"+mountName+"."+strconv.Itoa(i)+".mp3")
 				//} else {
