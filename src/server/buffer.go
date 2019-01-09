@@ -12,6 +12,7 @@ type BufElement struct {
 	locked bool
 	buffer []byte
 	next   *BufElement
+	prev   *BufElement
 	mux    sync.Mutex
 }
 
@@ -75,7 +76,7 @@ func (q *BufferQueue) Init(maxsize int) {
 	defer q.mux.Unlock()
 	q.size = 0
 	q.maxBufferSize = maxsize
-	q.minBufferSize = 10
+	q.minBufferSize = 6
 	q.first = nil
 	q.last = nil
 }
@@ -132,30 +133,23 @@ func (q *BufferQueue) Last() *BufElement {
 }
 
 //Start - returns the element to start with
-func (q *BufferQueue) Start() *BufElement {
+func (q *BufferQueue) Start(burstSize int) *BufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 
-	countBeforeLast := 10
-
-	var t, tnext *BufElement
-	t = q.first
+	burst := 0
+	var t *BufElement
+	t = q.last
 	if t == nil {
 		return nil
 	}
 
 	for {
-		if t.next == nil {
+		if t.prev == nil || burst >= burstSize {
 			break
 		}
-		tnext = t
-		for i := 0; i < countBeforeLast; i++ {
-			tnext = tnext.next
-			if tnext == nil {
-				return t
-			}
-		}
-		t = t.next
+		burst += len(t.buffer)
+		t = t.prev
 	}
 
 	return t
@@ -184,6 +178,7 @@ func (q *BufferQueue) checkAndTruncate() {
 				if q.size <= q.minBufferSize {
 					break
 				}
+				t.next.prev = nil
 				q.first = t.next
 				q.size--
 			} else {
@@ -207,6 +202,7 @@ func (q *BufferQueue) Append(buffer []byte, readed int) {
 	if q.size == 0 {
 		q.size = 1
 		t.next = nil
+		t.prev = nil
 		q.first = t
 		q.last = t
 		return
@@ -214,6 +210,7 @@ func (q *BufferQueue) Append(buffer []byte, readed int) {
 
 	q.last.mux.Lock()
 	q.last.next = t
+	t.prev = q.last
 	q.last.mux.Unlock()
 	q.last = t
 	q.size++

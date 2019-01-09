@@ -13,12 +13,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 const (
 	cServerName = "PenguinCast"
-	cVersion    = "0.07dev"
+	cVersion    = "0.08dev"
 )
 
 var (
@@ -33,10 +34,14 @@ type IceServer struct {
 	Props Properties
 
 	mux            sync.Mutex
-	Started        bool
+	Started        int32
 	StartedTime    time.Time
 	ListenersCount int
 	SourcesCount   int
+
+	// for monitor
+	cpuUsage float64
+	memUsage int
 
 	srv           *http.Server
 	logError      *log.Logger
@@ -55,7 +60,7 @@ func (i *IceServer) Init() error {
 
 	i.ListenersCount = 0
 	i.SourcesCount = 0
-	i.Started = false
+	i.Started = 0
 
 	log.Println("Init " + i.serverName + " " + i.version)
 
@@ -142,18 +147,16 @@ func (i *IceServer) checkSources() bool {
 
 // Close - finish
 func (i *IceServer) Close() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
 
-	for idx := range i.Props.Mounts {
-		i.Props.Mounts[idx].Close()
-	}
-
-	if err := i.srv.Shutdown(ctx); err != nil {
+	if err := i.srv.Shutdown(context.Background()); err != nil {
 		i.printError(1, err.Error())
 		log.Printf("Error: %s\n", err.Error())
 	} else {
 		log.Println("Stopped")
+	}
+
+	for idx := range i.Props.Mounts {
+		i.Props.Mounts[idx].Close()
 	}
 
 	i.logErrorFile.Close()
@@ -240,12 +243,9 @@ func (i *IceServer) runCommand(idx int, w http.ResponseWriter, r *http.Request) 
 
 /*Start - start listening port ...*/
 func (i *IceServer) Start() {
-	i.mux.Lock()
-	if i.Started {
-		i.mux.Unlock()
+	if atomic.LoadInt32(&i.Started) == 1 {
 		return
 	}
-	i.mux.Unlock()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, os.Kill)
@@ -264,9 +264,9 @@ func (i *IceServer) Start() {
 
 	go func() {
 		i.mux.Lock()
-		i.Started = true
 		i.StartedTime = time.Now()
 		i.mux.Unlock()
+		atomic.StoreInt32(&i.Started, 1)
 		log.Print("Started on " + i.srv.Addr)
 
 		if err := i.srv.ListenAndServe(); err != http.ErrServerClosed {
@@ -276,7 +276,5 @@ func (i *IceServer) Start() {
 	}()
 
 	<-stop
-	i.mux.Lock()
-	i.Started = false
-	i.mux.Unlock()
+	atomic.StoreInt32(&i.Started, 0)
 }

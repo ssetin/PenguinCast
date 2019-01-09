@@ -1,7 +1,7 @@
 set terminal png truecolor size 1024, 768 font "Helvetica,10"
 set datafile separator "\t"
-set title "CPU and Memory usage(Listeners count)\nCore2 Duo E7500 2.93GHz, 4 GB RAM"
-set output "Stat01.png"
+set title "CPU and Memory usage(Listeners count)\nCore2Duo E7500 2.93GHz, 4 GB RAM"
+set output "stat01.png"
 set grid ytics y2tics xtics
 set grid
 set key left top
@@ -12,7 +12,7 @@ totalMemory = totalMemoryGB*1024*1024
 
 set xdata time
 set timefmt "%Y-%m-%d %H:%M:%S"
-set format x "%d-%b\n%H:%M"
+set format x "%d.%m.%Y\n%H:%M"
 
 set style line 1 lw 2 lt 1 lc 3
 set style line 2 lw 2 lt 1 lc 1

@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -132,7 +133,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 	//pack = mount.buffer.First()
 	//try to maximize unused buffer pages from begining
-	pack = mount.buffer.Start()
+	pack = mount.buffer.Start(mount.BurstSize)
 
 	if pack == nil {
 		i.printError(1, "readMount Empty buffer")
@@ -143,6 +144,11 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	mount.incListeners()
 
 	for {
+		//check, if server has to be stopped
+		if atomic.LoadInt32(&i.Started) == 0 {
+			break
+		}
+
 		n++
 		pack.Lock()
 		if icymeta {
@@ -262,6 +268,11 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 	i.incSources()
 
 	for {
+		//check, if server has to be stopped
+		if atomic.LoadInt32(&i.Started) == 0 {
+			break
+		}
+
 		// max bytes per second according to bitrateclear
 		buff := make([]byte, mount.BitRate*1024/8)
 		readed, err = bufrw.Read(buff)

@@ -11,8 +11,8 @@ import (
 
 // ================================== Setup ========================================
 const (
-	listenersCount = 6000 // total number of listeners
-	incStep        = 25   // number of listeners, to increase with each step
+	listenersCount = 5000 // total number of listeners
+	incStep        = 30   // number of listeners, to increase with each step
 	waitStep       = 5    // seconds between each step
 	secToListen    = 5400 // seconds to listen by each connection
 	mountName      = "RockRadio96"
@@ -73,7 +73,7 @@ func BenchmarkListenersCount(b *testing.B) {
 }
 
 /*
-	go test -race -bench . -benchmem -timeout 300m main_test.go
+	go test -race -bench . -timeout 300m main_test.go
 	go test -bench . -benchmem -cpuprofile=cpu.out -memprofile=mem.out -timeout 300m main_test.go
 	mp3check -e -a -S -T -E -v dump/*.mp3
 	ulimit -n 63000

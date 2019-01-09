@@ -6,6 +6,7 @@ package iceserver
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"time"
@@ -16,7 +17,9 @@ import (
 
 //MonitorInfo ...
 type MonitorInfo struct {
-	Mounts []MountInfo
+	Mounts   []MountInfo
+	CPUUsage float64
+	MemUsage int
 }
 
 var upgrader = websocket.Upgrader{
@@ -39,6 +42,8 @@ func (i *IceServer) processStats() {
 		i.mux.Lock()
 		if i.ListenersCount > 0 {
 			fmt.Fprintf(i.statFile, time.Now().Format("2006-01-02 15:04:05")+"\t%d\t%f\t%f\n", i.ListenersCount, sysInfo.CPU, sysInfo.Memory/1024)
+			i.cpuUsage = math.Floor(sysInfo.CPU*100) / 100
+			i.memUsage = int(sysInfo.Memory / 1024)
 		}
 		i.mux.Unlock()
 		<-ticker.C
@@ -46,7 +51,7 @@ func (i *IceServer) processStats() {
 }
 
 func (i *IceServer) sendMonitorInfo(client *websocket.Conn) {
-	ticker := time.NewTicker(7 * time.Second)
+	ticker := time.NewTicker(6 * time.Second)
 	for {
 		w, err := client.NextWriter(websocket.TextMessage)
 		if err != nil {
@@ -61,6 +66,10 @@ func (i *IceServer) sendMonitorInfo(client *websocket.Conn) {
 			inf := i.Props.Mounts[idx].getMountsInfo()
 			monitorInfo.Mounts = append(monitorInfo.Mounts, inf)
 		}
+		i.mux.Lock()
+		monitorInfo.CPUUsage = i.cpuUsage
+		monitorInfo.MemUsage = i.memUsage
+		i.mux.Unlock()
 
 		msg, _ := json.Marshal(monitorInfo)
 		w.Write(msg)
