@@ -2,15 +2,20 @@ package main
 
 import (
 	"log"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ssetin/PenguinCast/src/client"
+	"github.com/ssetin/PenguinCast/src/server"
 )
+
+var IcySrv iceserver.IceServer
 
 // ================================== Setup ========================================
 const (
+	runServer      = true
 	listenersCount = 5000 // total number of listeners
 	incStep        = 30   // number of listeners, to increase with each step
 	waitStep       = 5    // seconds between each step
@@ -18,9 +23,6 @@ const (
 	mountName      = "RockRadio96"
 	hostAddr       = "192.168.10.2:8008"
 )
-
-/*
-var IcySrv iceserver.IceServer
 
 func startServer() {
 	err := IcySrv.Init()
@@ -31,18 +33,11 @@ func startServer() {
 	}
 	IcySrv.Start()
 }
-*/
 
-// ================================== Benchmarks ===========================================
+// ================================== Tests ===========================================
 
-func BenchmarkListenersCount(b *testing.B) {
+func TestMonitoringListenersCount(b *testing.T) {
 	// run server in another process to monitor it separately from clients
-	/*
-		go startServer()
-		time.Sleep(time.Second * 2)
-		log.Println("Waiting for SOURCE to connect...")
-		time.Sleep(time.Second * 10)
-	*/
 	log.Println("Start creating listeners...")
 
 	wg := &sync.WaitGroup{}
@@ -72,9 +67,73 @@ func BenchmarkListenersCount(b *testing.B) {
 	wg.Wait()
 }
 
+// ================================== Benchmarks ===========================================
+func init() {
+	if runServer {
+		go startServer()
+		time.Sleep(time.Second * 1)
+	}
+	log.Println("Waiting for SOURCE to connect...")
+	time.Sleep(time.Second * 5)
+}
+
+func BenchmarkSliceReusage01(b *testing.B) {
+	reader := strings.NewReader("go test -v -race MonitoringListenersCountgo test -v -race MonitoringListenersCount -timeout 300m main_test.go -timeout 300m main_test.go")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		p := make([]byte, 2)
+		for {
+			_, err := reader.Read(p)
+			if err != nil {
+				break
+			}
+		}
+	}
+}
+
+func BenchmarkSliceReusage02(b *testing.B) {
+	reader := strings.NewReader("go test -v -race MonitoringListenersCountgo test -v -race MonitoringListenersCount -timeout 300m main_test.go -timeout 300m main_test.go")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for {
+			p := make([]byte, 2)
+			_, err := reader.Read(p)
+			if err != nil {
+				break
+			}
+		}
+	}
+}
+
+func BenchmarkGeneral(b *testing.B) {
+
+	cl := &iceclient.PenguinClient{}
+	cl.Init(hostAddr, mountName, "")
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		err := cl.Listen(40)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
+}
+
 /*
-	go test -race -bench . -timeout 300m main_test.go
-	go test -bench . -benchmem -cpuprofile=cpu.out -memprofile=mem.out -timeout 300m main_test.go
+	go test -bench General -benchmem -benchtime 120s -cpuprofile=cpu.out -memprofile=mem.out main_test.go -run notests
+
+	go tool pprof --pdf  cpu.out > cpu.pdf
+	go tool pprof --pdf -alloc_space main.test mem.out > memSpace.pdf
+	go tool pprof --pdf -alloc_objects main.test mem.out > memObjects.pdf
+	go tool pprof --pdf -inuse_space main.test mem.out > memInUseSpace.pdf
+	go tool pprof --pdf -inuse_objects main.test mem.out > memInUseObjects.pdf
+	go tool pprof main.test cpu.out
+
+	go test -v -race MonitoringListenersCount -timeout 300m main_test.go
+	go test -bench Slice -benchmem main_test.go -run notests
+
 	mp3check -e -a -S -T -E -v dump/*.mp3
 	ulimit -n 63000
 */

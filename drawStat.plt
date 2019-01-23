@@ -6,7 +6,7 @@ set grid ytics y2tics xtics
 set grid
 set key left top
 
-# total memory size, bytes
+# total memory size, Kbytes
 totalMemoryGB = 4
 totalMemory = totalMemoryGB*1024*1024
 

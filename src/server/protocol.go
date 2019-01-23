@@ -5,7 +5,6 @@ package iceserver
 
 /*
 	TODO:
-	- writeMount auth/security issue
 	- readMount  write frame timeout
 */
 
@@ -104,6 +103,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	idle := 0
 	offset := 0
 	nometabytes := 0
+	partwrited := 0
 	nmtmp := 0
 	delta := 0
 	n := 0
@@ -149,6 +149,9 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 			break
 		}
 
+		//junk := make([]byte, 99999999)
+		//w.Write(junk)
+
 		n++
 		pack.Lock()
 		if icymeta {
@@ -157,7 +160,6 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 			packlen := len(pack.buffer)
 
 			if nometabytes+packlen+delta > mount.State.MetaInfo.MetaInt {
-				var partwrited int
 				offset = mount.State.MetaInfo.MetaInt - nometabytes - delta
 
 				//log.Printf("*** write block with meta ***")
@@ -228,8 +230,8 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 	var mount *Mount
 	mount = &i.Props.Mounts[idx]
 
-	mount.mux.Lock()
 	if !mount.State.Started {
+		mount.mux.Lock()
 		err := mount.auth(w, r)
 		if err != nil {
 			mount.mux.Unlock()
@@ -239,8 +241,12 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		mount.writeICEHeaders(w, r)
 		mount.State.Started = true
 		mount.State.StartedTime = time.Now()
+		mount.mux.Unlock()
+	} else {
+		i.printError(1, "SOURCE already connected")
+		http.Error(w, "SOURCE already connected", 403)
+		return
 	}
-	mount.mux.Unlock()
 
 	bytessended := 0
 	idle := 0
