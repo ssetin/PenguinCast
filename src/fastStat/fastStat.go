@@ -1,3 +1,5 @@
+// Package fastStat - read current process stat from /proc/[pid]/stat
+// used for CPU and memory usage monitoring
 package fastStat
 
 /* #include <unistd.h> */
@@ -79,7 +81,8 @@ func parseInt(val string) int {
 	return intVal
 }
 
-func (p *ProcStatsReader) Read() (*ProcStats, error) {
+// read - reads a /proc/[pid]/stat file and returns statistics
+func (p *ProcStatsReader) read() (*ProcStats, error) {
 	if p.procFile == nil {
 		return nil, errors.New("ProcStatsReader have to be initialized")
 	}
@@ -126,7 +129,7 @@ func (p *ProcStatsReader) GetCPUAndMem() (float64, int, error) {
 
 	if runtime.GOOS == "linux" {
 
-		stat, err := p.Read()
+		stat, err := p.read()
 		if err != nil {
 			return 0, 0, err
 		}
