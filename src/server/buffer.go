@@ -1,6 +1,7 @@
 // Package iceserver - icecast streaming server
 // Copyright 2018 Setin Sergei
 // Licensed under the Apache License, Version 2.0 (the "License")
+
 package iceserver
 
 import (
@@ -194,7 +195,9 @@ func (q *BufferQueue) checkAndTruncate() {
 func (q *BufferQueue) Append(buffer []byte, readed int) {
 	var t *BufElement
 	t = NewbufElement()
-	t.buffer = buffer[:readed]
+	//t.buffer = buffer[:readed]
+	t.buffer = make([]byte, readed)
+	copy(t.buffer, buffer)
 
 	q.mux.Lock()
 	defer q.mux.Unlock()

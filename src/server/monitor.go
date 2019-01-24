@@ -1,6 +1,7 @@
 // Package iceserver - icecast streaming server
 // Copyright 2018 Setin Sergei
 // Licensed under the Apache License, Version 2.0 (the "License")
+
 package iceserver
 
 import (
@@ -8,11 +9,9 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/struCoder/pidusage"
 )
 
 //MonitorInfo ...
@@ -33,18 +32,16 @@ var upgrader = websocket.Upgrader{
 func (i *IceServer) processStats() {
 	ticker := time.NewTicker(5 * time.Second)
 	for {
-		sysInfo, err := pidusage.GetStat(os.Getpid())
+		CPU, Memory, err := i.statReader.GetCPUAndMem()
 		if err != nil {
 			i.printError(1, err.Error())
 			ticker.Stop()
 			break
 		}
 		i.mux.Lock()
-		if i.ListenersCount > 0 {
-			fmt.Fprintf(i.statFile, time.Now().Format("2006-01-02 15:04:05")+"\t%d\t%f\t%f\n", i.ListenersCount, sysInfo.CPU, sysInfo.Memory/1024)
-			i.cpuUsage = math.Floor(sysInfo.CPU*100) / 100
-			i.memUsage = int(sysInfo.Memory / 1024)
-		}
+		fmt.Fprintf(i.statFile, time.Now().Format("2006-01-02 15:04:05")+"\t%d\t%f\t%d\n", i.ListenersCount, CPU, Memory/1024)
+		i.cpuUsage = math.Floor(CPU*100) / 100
+		i.memUsage = Memory / 1024
 		i.mux.Unlock()
 		<-ticker.C
 	}

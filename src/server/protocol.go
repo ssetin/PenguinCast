@@ -1,6 +1,7 @@
 // Package iceserver - icecast streaming server
 // Copyright 2018 Setin Sergei
 // Licensed under the Apache License, Version 2.0 (the "License")
+
 package iceserver
 
 /*
@@ -272,6 +273,7 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 	defer conn.Close()
 
 	i.incSources()
+	buff := make([]byte, mount.BitRate*1024/8)
 
 	for {
 		//check, if server has to be stopped
@@ -280,7 +282,7 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		}
 
 		// max bytes per second according to bitrateclear
-		buff := make([]byte, mount.BitRate*1024/8)
+
 		readed, err = bufrw.Read(buff)
 		if err != nil {
 			if err == io.EOF {

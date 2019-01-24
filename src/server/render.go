@@ -1,6 +1,7 @@
 // Package iceserver - icecast streaming server
 // Copyright 2018 Setin Sergei
 // Licensed under the Apache License, Version 2.0 (the "License")
+
 package iceserver
 
 import (

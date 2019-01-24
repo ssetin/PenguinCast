@@ -130,6 +130,7 @@ func BenchmarkGeneral(b *testing.B) {
 	go tool pprof --pdf -inuse_space main.test mem.out > memInUseSpace.pdf
 	go tool pprof --pdf -inuse_objects main.test mem.out > memInUseObjects.pdf
 	go tool pprof main.test cpu.out
+	go tool pprof main.test mem.out
 
 	go test -v -race MonitoringListenersCount -timeout 300m main_test.go
 	go test -bench Slice -benchmem main_test.go -run notests

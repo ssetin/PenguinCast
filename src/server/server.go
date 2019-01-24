@@ -1,6 +1,7 @@
 // Package iceserver - icecast streaming server
 // Copyright 2018 Setin Sergei
 // Licensed under the Apache License, Version 2.0 (the "License")
+
 package iceserver
 
 import (
@@ -15,11 +16,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/ssetin/PenguinCast/src/fastStat"
 )
 
 const (
 	cServerName = "PenguinCast"
-	cVersion    = "0.08dev"
+	cVersion    = "0.1dev"
 )
 
 var (
@@ -39,6 +42,7 @@ type IceServer struct {
 	ListenersCount int
 	SourcesCount   int
 
+	statReader fastStat.ProcStatsReader
 	// for monitor
 	cpuUsage float64
 	memUsage int
@@ -82,6 +86,7 @@ func (i *IceServer) Init() error {
 	}
 
 	if i.Props.Logging.UseStat {
+		i.statReader.Init()
 		go i.processStats()
 	}
 
@@ -159,6 +164,7 @@ func (i *IceServer) Close() {
 		i.Props.Mounts[idx].Close()
 	}
 
+	i.statReader.Close()
 	i.logErrorFile.Close()
 	i.logAccessFile.Close()
 	if i.statFile != nil {
