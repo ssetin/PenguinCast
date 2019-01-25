@@ -26,8 +26,9 @@ type PenguinClient struct {
 	mount        string
 	bitRate      int
 	dumpFileName string
-	dumpFile     *os.File
-	conn         net.Conn
+
+	dumpFile *os.File
+	conn     net.Conn
 }
 
 // Init - initialize client
@@ -49,14 +50,16 @@ func (p *PenguinClient) Init(host string, mount string, dump string) error {
 	return nil
 }
 
-func (p *PenguinClient) sayHello() error {
-	headerStr := "GET /" + p.mount + " HTTP/1.0\r\n"
-	headerStr += "icy-metadata: 1\r\n"
-	headerStr += "user-agent: " + cClientName + "/" + cVersion + "\r\n"
-	headerStr += "accept: */*\r\n"
-	headerStr += "\r\n"
-	_, err := p.conn.Write([]byte(headerStr))
-	return err
+func (p *PenguinClient) sayHello(writer *bufio.Writer) error {
+	writer.WriteString("GET /")
+	writer.WriteString(p.mount)
+	writer.WriteString(" HTTP/1.0\r\nicy-metadata: 0\r\nuser-agent: ")
+	writer.WriteString(cClientName)
+	writer.WriteString("/")
+	writer.WriteString(cVersion)
+	writer.WriteString("\r\naccept: */*\r\n\r\n")
+	writer.Flush()
+	return nil
 }
 
 func (p *PenguinClient) getMountInfo(reader *bufio.Reader) error {
@@ -98,12 +101,13 @@ func (p *PenguinClient) Listen(secToListen int) error {
 		defer p.dumpFile.Close()
 	}
 
-	err = p.sayHello()
+	reader := bufio.NewReader(p.conn)
+	writer := bufio.NewWriter(p.conn)
+
+	err = p.sayHello(writer)
 	if err != nil {
 		return err
 	}
-
-	reader := bufio.NewReader(p.conn)
 
 	err = p.getMountInfo(reader)
 	if err != nil {
@@ -129,7 +133,7 @@ func (p *PenguinClient) Listen(secToListen int) error {
 			p.dumpFile.Write(sndBuff[:n])
 		}
 		readedBytes += n
-		time.Sleep(time.Millisecond * 107)
+		time.Sleep(time.Millisecond * 101)
 	}
 
 	return nil

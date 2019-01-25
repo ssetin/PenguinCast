@@ -73,7 +73,7 @@ func (q *BufferQueue) Init(maxsize int) {
 	defer q.mux.Unlock()
 	q.size = 0
 	q.maxBufferSize = maxsize
-	q.minBufferSize = 8
+	q.minBufferSize = 7
 	q.first = nil
 	q.last = nil
 }

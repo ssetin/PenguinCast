@@ -19,7 +19,7 @@ import (
 
 const (
 	cServerName = "PenguinCast"
-	cVersion    = "0.10dev"
+	cVersion    = "0.11dev"
 )
 
 var (
@@ -36,8 +36,8 @@ type IceServer struct {
 	mux            sync.Mutex
 	Started        int32
 	StartedTime    time.Time
-	ListenersCount int
-	SourcesCount   int
+	ListenersCount int32
+	SourcesCount   int32
 
 	statReader fastStat.ProcStatsReader
 	// for monitor
@@ -102,9 +102,7 @@ func (i *IceServer) initMounts() error {
 }
 
 func (i *IceServer) incListeners() {
-	i.mux.Lock()
-	defer i.mux.Unlock()
-	i.ListenersCount++
+	atomic.AddInt32(&i.ListenersCount, 1)
 }
 
 func (i *IceServer) decListeners() {
@@ -116,18 +114,15 @@ func (i *IceServer) decListeners() {
 }
 
 func (i *IceServer) checkListeners() bool {
-	i.mux.Lock()
-	defer i.mux.Unlock()
-	if i.ListenersCount >= i.Props.Limits.Clients {
+	clientsLimit := atomic.LoadInt32(&i.Props.Limits.Clients)
+	if atomic.LoadInt32(&i.ListenersCount) >= clientsLimit {
 		return false
 	}
 	return true
 }
 
 func (i *IceServer) incSources() {
-	i.mux.Lock()
-	defer i.mux.Unlock()
-	i.SourcesCount++
+	atomic.AddInt32(&i.SourcesCount, 1)
 }
 
 func (i *IceServer) decSources() {

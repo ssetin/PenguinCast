@@ -2,13 +2,12 @@ package main
 
 import (
 	"log"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ssetin/PenguinCast/src/client"
-	"github.com/ssetin/PenguinCast/src/server"
+	iceclient "github.com/ssetin/PenguinCast/src/client"
+	iceserver "github.com/ssetin/PenguinCast/src/server"
 )
 
 var IcySrv iceserver.IceServer
@@ -77,34 +76,6 @@ func init() {
 	time.Sleep(time.Second * 5)
 }
 
-func BenchmarkSliceReusage01(b *testing.B) {
-	reader := strings.NewReader("go test -v -race MonitoringListenersCountgo test -v -race MonitoringListenersCount -timeout 300m main_test.go -timeout 300m main_test.go")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		p := make([]byte, 2)
-		for {
-			_, err := reader.Read(p)
-			if err != nil {
-				break
-			}
-		}
-	}
-}
-
-func BenchmarkSliceReusage02(b *testing.B) {
-	reader := strings.NewReader("go test -v -race MonitoringListenersCountgo test -v -race MonitoringListenersCount -timeout 300m main_test.go -timeout 300m main_test.go")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		for {
-			p := make([]byte, 2)
-			_, err := reader.Read(p)
-			if err != nil {
-				break
-			}
-		}
-	}
-}
-
 func BenchmarkGeneral(b *testing.B) {
 
 	cl := &iceclient.PenguinClient{}
@@ -124,15 +95,15 @@ func BenchmarkParallel(b *testing.B) {
 
 	wg := &sync.WaitGroup{}
 
-	for i := 0; i < 1000/incStep; i++ {
+	for i := 0; i < 500/incStep; i++ {
 		wg.Add(incStep)
 		for k := 0; k < incStep; k++ {
 			go func(wg *sync.WaitGroup, i int) {
 				defer wg.Done()
-				time.Sleep(time.Millisecond * 200)
+				time.Sleep(time.Millisecond * 100)
 				cl := &iceclient.PenguinClient{}
 				cl.Init(hostAddr, mountName, "")
-				err := cl.Listen(300)
+				err := cl.Listen(120)
 				if err != nil {
 					log.Println(err)
 				}

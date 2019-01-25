@@ -18,10 +18,10 @@ type Properties struct {
 	} `json:"Socket"`
 
 	Limits struct {
-		Clients                int `json:"Clients"`
-		Sources                int `json:"Sources"`
-		SourceIdleTimeOut      int `json:"SourceIdleTimeOut"`
-		EmptyBufferIdleTimeOut int `json:"EmptyBufferIdleTimeOut"`
+		Clients                int32 `json:"Clients"`
+		Sources                int32 `json:"Sources"`
+		SourceIdleTimeOut      int   `json:"SourceIdleTimeOut"`
+		EmptyBufferIdleTimeOut int   `json:"EmptyBufferIdleTimeOut"`
 	} `json:"Limits"`
 
 	Auth struct {

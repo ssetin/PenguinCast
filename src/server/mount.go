@@ -29,7 +29,7 @@ type MetaData struct {
 // MountInfo ...
 type MountInfo struct {
 	Name      string
-	Listeners int
+	Listeners int32
 	UpTime    string
 	Buff      BufferInfo
 }
@@ -53,7 +53,7 @@ type Mount struct {
 		StartedTime     time.Time
 		MetaInfo        MetaData
 		metaInfoCounter int32
-		Listeners       int
+		Listeners       int32
 	} `json:"-"`
 
 	mux      sync.Mutex
@@ -67,7 +67,7 @@ func (m *Mount) Init(srv *IceServer) error {
 	m.Server = srv
 	m.Clear()
 	m.State.MetaInfo.MetaInt = m.BitRate * 1024 / 8 * 10
-	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8) + 10)
+	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8) + 20)
 	if m.DumpFile > "" {
 		var err error
 		m.dumpFile, err = os.OpenFile(srv.Props.Paths.Log+m.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
@@ -105,9 +105,7 @@ func (m *Mount) metaInfoChanged(val int32) bool {
 }
 
 func (m *Mount) incListeners() {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-	m.State.Listeners++
+	atomic.AddInt32(&m.State.Listeners, 1)
 }
 
 func (m *Mount) decListeners() {
@@ -119,7 +117,7 @@ func (m *Mount) decListeners() {
 }
 
 func (m *Mount) zeroListeners() {
-	m.State.Listeners = 0
+	atomic.StoreInt32(&m.State.Listeners, 0)
 }
 
 func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {

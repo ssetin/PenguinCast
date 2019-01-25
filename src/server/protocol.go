@@ -209,7 +209,6 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		if bytessended >= mount.BurstSize {
 			flusher.Flush()
 			time.Sleep(1000 * time.Millisecond)
-			//SleepASecond()
 		}
 
 		nextpack = pack.Next()
@@ -310,7 +309,6 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		}
 
 		time.Sleep(1000 * time.Millisecond)
-		//SleepASecond()
 
 		//check if maxbuffersize reached and truncate it
 		mount.buffer.checkAndTruncate()
