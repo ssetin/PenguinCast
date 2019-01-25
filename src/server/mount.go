@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/html/charset"
@@ -48,10 +49,11 @@ type Mount struct {
 	MaxListeners int    `json:"MaxListeners"`
 
 	State struct {
-		Started     bool
-		StartedTime time.Time
-		MetaInfo    MetaData
-		Listeners   int
+		Started         bool
+		StartedTime     time.Time
+		MetaInfo        MetaData
+		metaInfoCounter int32
+		Listeners       int
 	} `json:"-"`
 
 	mux      sync.Mutex
@@ -92,6 +94,14 @@ func (m *Mount) Clear() {
 	m.zeroListeners()
 	m.State.MetaInfo.StreamTitle = ""
 	m.StreamURL = "http://" + m.Server.Props.Host + ":" + strconv.Itoa(m.Server.Props.Socket.Port) + "/" + m.Name
+}
+
+func (m *Mount) metaInfoChanged(val int32) bool {
+	storedVal := atomic.LoadInt32(&m.State.metaInfoCounter)
+	if storedVal == val {
+		return false
+	}
+	return true
 }
 
 func (m *Mount) incListeners() {
@@ -184,9 +194,6 @@ func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
 	err := m.auth(w, r)
 	if err != nil {
 		return
@@ -194,15 +201,21 @@ func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
 
 	song := r.URL.Query().Get("song")
 	songReader := strings.NewReader(song)
-
 	enc, _, _ := charset.DetermineEncoding(([]byte)(song), "")
 	utf8Reader := transform.NewReader(songReader, enc.NewDecoder())
 	result, err := ioutil.ReadAll(utf8Reader)
+
+	atomic.AddInt32(&m.State.metaInfoCounter, 1)
+
 	if err != nil {
+		m.mux.Lock()
 		m.State.MetaInfo.StreamTitle = ""
+		m.mux.Unlock()
 		return
 	}
+	m.mux.Lock()
 	m.State.MetaInfo.StreamTitle = string(result[:])
+	m.mux.Unlock()
 }
 
 func fmtDuration(d time.Duration) string {
@@ -229,19 +242,19 @@ func (m *Mount) getMountsInfo() MountInfo {
 }
 
 // icy style metadata
-func (m *Mount) getIcyMeta() []byte {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
+func (m *Mount) getIcyMeta() ([]byte, int32) {
 	var metaSize byte
 	var result string
+
+	m.mux.Lock()
 	if m.State.MetaInfo.StreamTitle > "" {
 		result = "StreamTitle='" + m.State.MetaInfo.StreamTitle + "';"
 	} else {
 		result = "StreamTitle='" + m.Description + "';"
 	}
-	metaSize = byte(math.Ceil(float64(len(result)) / 16.0))
+	m.mux.Unlock()
 
+	metaSize = byte(math.Ceil(float64(len(result)) / 16.0))
 	meta := make([]byte, metaSize*16+1)
 	meta[0] = metaSize
 
@@ -249,5 +262,5 @@ func (m *Mount) getIcyMeta() []byte {
 		meta[idx+1] = result[idx]
 	}
 
-	return meta
+	return meta, atomic.LoadInt32(&m.State.metaInfoCounter)
 }

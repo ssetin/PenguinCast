@@ -124,7 +124,7 @@ func BenchmarkParallel(b *testing.B) {
 
 	wg := &sync.WaitGroup{}
 
-	for i := 0; i < 500/incStep; i++ {
+	for i := 0; i < 1000/incStep; i++ {
 		wg.Add(incStep)
 		for k := 0; k < incStep; k++ {
 			go func(wg *sync.WaitGroup, i int) {
@@ -132,7 +132,7 @@ func BenchmarkParallel(b *testing.B) {
 				time.Sleep(time.Millisecond * 200)
 				cl := &iceclient.PenguinClient{}
 				cl.Init(hostAddr, mountName, "")
-				err := cl.Listen(120)
+				err := cl.Listen(300)
 				if err != nil {
 					log.Println(err)
 				}
@@ -149,16 +149,14 @@ func BenchmarkParallel(b *testing.B) {
 	go test -bench General  -benchmem -benchtime 120s -cpuprofile=cpu.out -memprofile=mem.out main_test.go -run notests
 	go test -bench Parallel -benchmem -cpuprofile=cpu.out -memprofile=mem.out main_test.go -run notests
 
-	go tool pprof --pdf  cpu.out > cpu.pdf
-	go tool pprof --pdf -alloc_space main.test mem.out > memSpace.pdf
-	go tool pprof --pdf -alloc_objects main.test mem.out > memObjects.pdf
-	go tool pprof --pdf -inuse_space main.test mem.out > memInUseSpace.pdf
-	go tool pprof --pdf -inuse_objects main.test mem.out > memInUseObjects.pdf
 	go tool pprof main.test cpu.out
-	go tool pprof main.test mem.out
+	go tool pprof -alloc_objects main.test mem.out
+	go tool pprof main.test block.out
 
 	go test -v -run MonitoringListenersCount -timeout 300m main_test.go
 	go test -bench Slice -benchmem main_test.go -run notests
+
+	go-torch main.test cpu.out
 
 	mp3check -e -a -S -T -E -v dump/*.mp3
 	ulimit -n 63000

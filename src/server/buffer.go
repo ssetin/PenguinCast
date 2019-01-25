@@ -3,11 +3,13 @@ package iceserver
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 //BufElement - kind of buffer page
 type BufElement struct {
-	locked bool
+	locked int32
+	len    int
 	buffer []byte
 	next   *BufElement
 	prev   *BufElement
@@ -34,7 +36,7 @@ type BufferInfo struct {
 // NewbufElement - returns new buffer element (page)
 func NewbufElement() *BufElement {
 	var t *BufElement
-	t = &BufElement{locked: false}
+	t = &BufElement{}
 	return t
 }
 
@@ -47,23 +49,20 @@ func (q *BufElement) Next() *BufElement {
 
 //Lock ...
 func (q *BufElement) Lock() {
-	q.mux.Lock()
-	defer q.mux.Unlock()
-	q.locked = true
+	atomic.StoreInt32(&q.locked, 1)
 }
 
 //UnLock ...
 func (q *BufElement) UnLock() {
-	q.mux.Lock()
-	defer q.mux.Unlock()
-	q.locked = false
+	atomic.StoreInt32(&q.locked, 0)
 }
 
 //IsLocked (logical lock, mean it's in use)
 func (q *BufElement) IsLocked() bool {
-	q.mux.Lock()
-	defer q.mux.Unlock()
-	return q.locked
+	if atomic.LoadInt32(&q.locked) == 0 {
+		return false
+	}
+	return true
 }
 
 //***************************************
@@ -74,7 +73,7 @@ func (q *BufferQueue) Init(maxsize int) {
 	defer q.mux.Unlock()
 	q.size = 0
 	q.maxBufferSize = maxsize
-	q.minBufferSize = 6
+	q.minBufferSize = 8
 	q.first = nil
 	q.last = nil
 }
@@ -100,7 +99,7 @@ func (q *BufferQueue) Info() BufferInfo {
 			break
 		}
 		result.Size++
-		result.SizeBytes += len(t.buffer)
+		result.SizeBytes += t.len
 
 		if t.IsLocked() {
 			str = str + "1"
@@ -146,7 +145,7 @@ func (q *BufferQueue) Start(burstSize int) *BufElement {
 		if t.prev == nil || burst >= burstSize {
 			break
 		}
-		burst += len(t.buffer)
+		burst += t.len
 		t = t.prev
 	}
 
@@ -192,8 +191,9 @@ func (q *BufferQueue) checkAndTruncate() {
 func (q *BufferQueue) Append(buffer []byte, readed int) {
 	var t *BufElement
 	t = NewbufElement()
-	//t.buffer = buffer[:readed]
+
 	t.buffer = make([]byte, readed)
+	t.len = readed
 	copy(t.buffer, buffer)
 
 	q.mux.Lock()

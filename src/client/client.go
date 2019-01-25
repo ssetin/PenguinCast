@@ -16,7 +16,7 @@ import (
 // ================================== PenguinClient ========================================
 const (
 	cClientName = "penguinClient"
-	cVersion    = "0.1"
+	cVersion    = "0.2"
 )
 
 // PenguinClient ...
@@ -51,7 +51,7 @@ func (p *PenguinClient) Init(host string, mount string, dump string) error {
 
 func (p *PenguinClient) sayHello() error {
 	headerStr := "GET /" + p.mount + " HTTP/1.0\r\n"
-	headerStr += "icy-metadata: 0\r\n"
+	headerStr += "icy-metadata: 1\r\n"
 	headerStr += "user-agent: " + cClientName + "/" + cVersion + "\r\n"
 	headerStr += "accept: */*\r\n"
 	headerStr += "\r\n"
@@ -59,8 +59,7 @@ func (p *PenguinClient) sayHello() error {
 	return err
 }
 
-func (p *PenguinClient) getMountInfo() error {
-	reader := bufio.NewReader(p.conn)
+func (p *PenguinClient) getMountInfo(reader *bufio.Reader) error {
 	tp := textproto.NewReader(reader)
 
 	for {
@@ -104,7 +103,9 @@ func (p *PenguinClient) Listen(secToListen int) error {
 		return err
 	}
 
-	err = p.getMountInfo()
+	reader := bufio.NewReader(p.conn)
+
+	err = p.getMountInfo(reader)
 	if err != nil {
 		log.Println(err.Error())
 		return err
@@ -119,7 +120,7 @@ func (p *PenguinClient) Listen(secToListen int) error {
 	sndBuff := make([]byte, 1024*p.bitRate/8)
 
 	for readedBytes <= bytesToFinish {
-		n, err := p.conn.Read(sndBuff)
+		n, err := reader.Read(sndBuff)
 		if err != nil {
 			return err
 		}
@@ -128,7 +129,7 @@ func (p *PenguinClient) Listen(secToListen int) error {
 			p.dumpFile.Write(sndBuff[:n])
 		}
 		readedBytes += n
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 107)
 	}
 
 	return nil

@@ -93,6 +93,8 @@ func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 */
 func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *http.Request) {
 	var mount *Mount
+	var metaCounter int32
+	var meta []byte
 	var err error
 	var pack, nextpack *BufElement
 
@@ -102,8 +104,11 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	offset := 0
 	nometabytes := 0
 	partwrited := 0
+	metaCounter = -1
 	nmtmp := 0
 	delta := 0
+	metalen := 0
+	packlen := 0
 	n := 0
 
 	start := time.Now()
@@ -129,7 +134,6 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	w.WriteHeader(http.StatusOK)
 	flusher, _ := w.(http.Flusher)
 
-	//pack = mount.buffer.First()
 	//try to maximize unused buffer pages from begining
 	pack = mount.buffer.Start(mount.BurstSize)
 
@@ -153,9 +157,12 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		n++
 		pack.Lock()
 		if icymeta {
-			meta := mount.getIcyMeta()
-			metalen := len(meta)
-			packlen := len(pack.buffer)
+			//check, if metainfo changed
+			if mount.metaInfoChanged(metaCounter) {
+				meta, metaCounter = mount.getIcyMeta()
+			}
+			metalen = len(meta)
+			packlen = pack.len
 
 			if nometabytes+packlen+delta > mount.State.MetaInfo.MetaInt {
 				offset = mount.State.MetaInfo.MetaInt - nometabytes - delta
@@ -202,6 +209,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		if bytessended >= mount.BurstSize {
 			flusher.Flush()
 			time.Sleep(1000 * time.Millisecond)
+			//SleepASecond()
 		}
 
 		nextpack = pack.Next()
@@ -270,6 +278,7 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 	defer conn.Close()
 
 	i.incSources()
+	// max bytes per second according to bitrateclear
 	buff := make([]byte, mount.BitRate*1024/8)
 
 	for {
@@ -277,8 +286,6 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		if atomic.LoadInt32(&i.Started) == 0 {
 			break
 		}
-
-		// max bytes per second according to bitrateclear
 
 		readed, err = bufrw.Read(buff)
 		if err != nil {
@@ -303,6 +310,7 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		}
 
 		time.Sleep(1000 * time.Millisecond)
+		//SleepASecond()
 
 		//check if maxbuffersize reached and truncate it
 		mount.buffer.checkAndTruncate()
