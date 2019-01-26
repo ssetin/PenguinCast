@@ -53,7 +53,7 @@ func (p *PenguinClient) Init(host string, mount string, dump string) error {
 func (p *PenguinClient) sayHello(writer *bufio.Writer) error {
 	writer.WriteString("GET /")
 	writer.WriteString(p.mount)
-	writer.WriteString(" HTTP/1.0\r\nicy-metadata: 0\r\nuser-agent: ")
+	writer.WriteString(" HTTP/1.0\r\nicy-metadata: 1\r\nuser-agent: ")
 	writer.WriteString(cClientName)
 	writer.WriteString("/")
 	writer.WriteString(cVersion)

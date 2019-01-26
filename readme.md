@@ -71,7 +71,7 @@ Configuration parameters are stored in config.json.
 
 
 ## Load testing
-I did'nt have a goals to measure the maximum number of listeners, but only to look at the overall picture of working server. The server has been tested for CPU and memory usage. For testing, i used a simplified version of the client, which connects to the server and writes the resulting stream to files (first 30 listeners). Two test scripts was launched on two machines and create a new connections every 5 seconds until the number of listeners is not reached 13 thousand. Each connection listened the stream for 1:30 hour and then shuted down. Meanwhile, CPU and memory usage statistics collection has been enabled on PenguinCast and based on these data the following chart was constructed. After the test was completed, the resulting dump files were tested by mp3check for errors.
+I did'nt have a goals to measure the maximum number of listeners, but only to look at the overall picture of working server. The server has been tested for CPU and memory usage. For testing, i used a simplified version of the client, which connects to the server and writes the resulting stream to files (first 30 listeners). Two test scripts was launched on two machines and create a new connections every 5 seconds until the number of listeners is not reached 13.5 thousand. Each connection listened the stream for 1:30 hour and then shuted down. Meanwhile, CPU and memory usage statistics collection has been enabled on PenguinCast and based on these data the following chart was constructed. After the test was completed, the resulting dump files were tested by mp3check for errors.
 
 Radio server was broadcasting 96 Kb/s mp3 stream and also acted as listeners generator.  
 

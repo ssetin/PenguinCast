@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -103,19 +104,19 @@ func (i *IceServer) initMounts() error {
 
 func (i *IceServer) incListeners() {
 	atomic.AddInt32(&i.ListenersCount, 1)
+	runtime.Gosched()
 }
 
 func (i *IceServer) decListeners() {
-	i.mux.Lock()
-	defer i.mux.Unlock()
-	if i.ListenersCount > 0 {
-		i.ListenersCount--
+	if atomic.LoadInt32(&i.ListenersCount) > 0 {
+		atomic.AddInt32(&i.ListenersCount, -1)
+		runtime.Gosched()
 	}
 }
 
 func (i *IceServer) checkListeners() bool {
 	clientsLimit := atomic.LoadInt32(&i.Props.Limits.Clients)
-	if atomic.LoadInt32(&i.ListenersCount) >= clientsLimit {
+	if atomic.LoadInt32(&i.ListenersCount) > clientsLimit {
 		return false
 	}
 	return true
@@ -123,20 +124,19 @@ func (i *IceServer) checkListeners() bool {
 
 func (i *IceServer) incSources() {
 	atomic.AddInt32(&i.SourcesCount, 1)
+	runtime.Gosched()
 }
 
 func (i *IceServer) decSources() {
-	i.mux.Lock()
-	defer i.mux.Unlock()
-	if i.SourcesCount > 0 {
-		i.SourcesCount--
+	if atomic.LoadInt32(&i.SourcesCount) > 0 {
+		atomic.AddInt32(&i.SourcesCount, -1)
+		runtime.Gosched()
 	}
 }
 
 func (i *IceServer) checkSources() bool {
-	i.mux.Lock()
-	defer i.mux.Unlock()
-	if i.SourcesCount >= i.Props.Limits.Sources {
+	sourcesLimit := atomic.LoadInt32(&i.Props.Limits.Sources)
+	if atomic.LoadInt32(&i.SourcesCount) > sourcesLimit {
 		return false
 	}
 	return true
@@ -182,7 +182,7 @@ func (i *IceServer) checkIsCommand(page string, r *http.Request) int {
 	return -1
 }
 
-func (i *IceServer) sayHello(w http.ResponseWriter, r *http.Request) {
+func (i *IceServer) saySourceHello(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Server", i.serverName+"/"+i.version)
 	w.Header().Set("Connection", "Keep-Alive")
 	w.Header().Set("Allow", "GET, SOURCE")

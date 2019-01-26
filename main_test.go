@@ -15,9 +15,9 @@ var IcySrv iceserver.IceServer
 // ================================== Setup ========================================
 const (
 	runServer      = true
-	listenersCount = 5000 // total number of listeners
-	incStep        = 30   // number of listeners, to increase with each step
-	waitStep       = 5    // seconds between each step
+	listenersCount = 500  // total number of listeners
+	incStep        = 50   // number of listeners, to increase with each step
+	waitStep       = 2    // seconds between each step
 	secToListen    = 5400 // seconds to listen by each connection
 	mountName      = "RockRadio96"
 	hostAddr       = "192.168.10.2:8008"
@@ -48,14 +48,14 @@ func TestMonitoringListenersCount(b *testing.T) {
 				defer wg.Done()
 				time.Sleep(time.Millisecond * 200)
 				cl := &iceclient.PenguinClient{}
-				//if i < 30 {
+				//if i < 0 {
 				//	cl.Init(hostAddr, mountName, "dump/"+mountName+"."+strconv.Itoa(i)+".mp3")
 				//} else {
 				cl.Init(hostAddr, mountName, "")
 				//}
 				err := cl.Listen(secToListen)
 				if err != nil {
-					log.Println(err)
+					//log.Println(err)
 				}
 			}(wg, i)
 		}
@@ -64,6 +64,12 @@ func TestMonitoringListenersCount(b *testing.T) {
 	}
 	log.Println("Waiting for listeners to finito...")
 	wg.Wait()
+}
+
+func TestDump(b *testing.T) {
+	cl := &iceclient.PenguinClient{}
+	cl.Init(hostAddr, mountName, "dump/dump2.mp3")
+	cl.Listen(1)
 }
 
 // ================================== Benchmarks ===========================================
@@ -83,7 +89,7 @@ func BenchmarkGeneral(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		err := cl.Listen(40)
+		err := cl.Listen(2)
 		if err != nil {
 			log.Println(err)
 		}
@@ -116,16 +122,22 @@ func BenchmarkParallel(b *testing.B) {
 	wg.Wait()
 }
 
+func BenchmarkNone(b *testing.B) {
+	log.Println("Waiting for listeners...")
+	time.Sleep(time.Second * 550)
+}
+
 /*
 	go test -bench General  -benchmem -benchtime 120s -cpuprofile=cpu.out -memprofile=mem.out main_test.go -run notests
-	go test -bench Parallel -benchmem -cpuprofile=cpu.out -memprofile=mem.out main_test.go -run notests
+	go test -bench Parallel -race -benchmem -cpuprofile=cpu.out -memprofile=mem.out main_test.go -run notests
+	go test -bench None -benchmem -cpuprofile=cpu.out -memprofile=mem.out main_test.go -run notests
 
 	go tool pprof main.test cpu.out
 	go tool pprof -alloc_objects main.test mem.out
 	go tool pprof main.test block.out
 
-	go test -v -run MonitoringListenersCount -timeout 300m main_test.go
-	go test -bench Slice -benchmem main_test.go -run notests
+	go test -v -run MonitoringListenersCount -race -timeout 300m main_test.go
+	go test -v -run Dump main_test.go
 
 	go-torch main.test cpu.out
 

@@ -33,11 +33,18 @@ type BufferInfo struct {
 	InUse     int
 }
 
-// NewbufElement - returns new buffer element (page)
-func NewbufElement() *BufElement {
-	var t *BufElement
-	t = &BufElement{}
-	return t
+// NewBufElement - returns new buffer element (page)
+func NewBufElement() *BufElement {
+	return &BufElement{}
+}
+
+//Clear ...
+func (q *BufElement) Clear() {
+	q.mux.Lock()
+	defer q.mux.Unlock()
+	q.len = 0
+	q.locked = 0
+	q.buffer = nil
 }
 
 //Next ...
@@ -88,11 +95,13 @@ func (q *BufferQueue) Size() int {
 // Info - returns buffer state
 func (q *BufferQueue) Info() BufferInfo {
 	var result BufferInfo
+	var t *BufElement
+	str := ""
+
 	q.mux.Lock()
 	defer q.mux.Unlock()
-	var t *BufElement
+
 	t = q.first
-	str := ""
 
 	for {
 		if t == nil {
@@ -175,6 +184,7 @@ func (q *BufferQueue) checkAndTruncate() {
 				if q.size <= q.minBufferSize {
 					break
 				}
+				t.next.prev.buffer = nil
 				t.next.prev = nil
 				q.first = t.next
 				q.size--
@@ -189,8 +199,7 @@ func (q *BufferQueue) checkAndTruncate() {
 
 //Append - appends new page to the end of the buffer queue
 func (q *BufferQueue) Append(buffer []byte, readed int) {
-	var t *BufElement
-	t = NewbufElement()
+	t := NewBufElement()
 
 	t.buffer = make([]byte, readed)
 	t.len = readed

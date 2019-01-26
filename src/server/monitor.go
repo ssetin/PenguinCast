@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -35,8 +36,8 @@ func (i *IceServer) processStats() {
 			ticker.Stop()
 			break
 		}
+		fmt.Fprintf(i.statFile, time.Now().Format("2006-01-02 15:04:05")+"\t%d\t%f\t%d\n", atomic.LoadInt32(&i.ListenersCount), CPU, Memory/1024)
 		i.mux.Lock()
-		fmt.Fprintf(i.statFile, time.Now().Format("2006-01-02 15:04:05")+"\t%d\t%f\t%d\n", i.ListenersCount, CPU, Memory/1024)
 		i.cpuUsage = math.Floor(CPU*100) / 100
 		i.memUsage = Memory / 1024
 		i.mux.Unlock()

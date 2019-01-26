@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -67,7 +68,7 @@ func (m *Mount) Init(srv *IceServer) error {
 	m.Server = srv
 	m.Clear()
 	m.State.MetaInfo.MetaInt = m.BitRate * 1024 / 8 * 10
-	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8) + 20)
+	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8) + 10)
 	if m.DumpFile > "" {
 		var err error
 		m.dumpFile, err = os.OpenFile(srv.Props.Paths.Log+m.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
@@ -75,6 +76,7 @@ func (m *Mount) Init(srv *IceServer) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -106,25 +108,26 @@ func (m *Mount) metaInfoChanged(val int32) bool {
 
 func (m *Mount) incListeners() {
 	atomic.AddInt32(&m.State.Listeners, 1)
+	runtime.Gosched()
 }
 
 func (m *Mount) decListeners() {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-	if m.State.Listeners > 0 {
-		m.State.Listeners--
+	if atomic.LoadInt32(&m.State.Listeners) > 0 {
+		atomic.AddInt32(&m.State.Listeners, -1)
+		runtime.Gosched()
 	}
 }
 
 func (m *Mount) zeroListeners() {
 	atomic.StoreInt32(&m.State.Listeners, 0)
+	runtime.Gosched()
 }
 
 func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 	strAuth := r.Header.Get("authorization")
 
 	if strAuth == "" {
-		m.Server.sayHello(w, r)
+		m.Server.saySourceHello(w, r)
 		return errors.New("No authorization field")
 	}
 
@@ -151,7 +154,7 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 		return errors.New("Wrong user or password")
 	}
 
-	m.Server.sayHello(w, r)
+	m.Server.saySourceHello(w, r)
 
 	return nil
 }
@@ -227,21 +230,22 @@ func fmtDuration(d time.Duration) string {
 }
 
 func (m *Mount) getMountsInfo() MountInfo {
-	m.mux.Lock()
-	defer m.mux.Unlock()
 	var t MountInfo
+	t.Listeners = atomic.LoadInt32(&m.State.Listeners)
+	m.mux.Lock()
 	t.Name = m.Name
-	t.Listeners = m.State.Listeners
 	if m.State.Started {
 		t.UpTime = fmtDuration(time.Since(m.State.StartedTime))
 	}
+	m.mux.Unlock()
 	t.Buff = m.buffer.Info()
 	return t
 }
 
 // icy style metadata
-func (m *Mount) getIcyMeta() ([]byte, int32) {
+func (m *Mount) getIcyMeta() ([]byte, int, int32) {
 	var metaSize byte
+	var metaSizeByte int
 	var result string
 
 	m.mux.Lock()
@@ -253,12 +257,13 @@ func (m *Mount) getIcyMeta() ([]byte, int32) {
 	m.mux.Unlock()
 
 	metaSize = byte(math.Ceil(float64(len(result)) / 16.0))
-	meta := make([]byte, metaSize*16+1)
+	metaSizeByte = int(metaSize)*16 + 1
+	meta := make([]byte, metaSizeByte)
 	meta[0] = metaSize
 
 	for idx := 0; idx < len(result); idx++ {
 		meta[idx+1] = result[idx]
 	}
 
-	return meta, atomic.LoadInt32(&m.State.metaInfoCounter)
+	return meta, metaSizeByte, atomic.LoadInt32(&m.State.metaInfoCounter)
 }

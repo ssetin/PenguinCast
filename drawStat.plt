@@ -1,7 +1,7 @@
 set terminal png truecolor size 1024, 768 font "Helvetica,10"
 set datafile separator "\t"
 set title "CPU and Memory usage(Listeners count)\nCore2Duo E7500 2.93GHz, 4 GB RAM"
-set output "stat01.png"
+set output "ue_stat01tmp.png"
 set grid ytics y2tics xtics
 set grid
 set key left top

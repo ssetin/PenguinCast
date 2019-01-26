@@ -108,7 +108,6 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	nmtmp := 0
 	delta := 0
 	metalen := 0
-	packlen := 0
 	n := 0
 
 	start := time.Now()
@@ -120,13 +119,13 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 	w.Header().Set("Server", i.serverName+" "+i.version)
 	w.Header().Set("Content-Type", mount.ContentType)
+	w.Header().Set("X-Audiocast-Bitrate", strconv.Itoa(mount.BitRate))
 	w.Header().Set("Connection", "Keep-Alive")
-	w.Header().Set("x-audiocast-name", mount.Name)
-	w.Header().Set("x-audiocast-genre", mount.Genre)
-	w.Header().Set("x-audiocast-url", mount.StreamURL)
-	w.Header().Set("x-audiocast-public", "0")
-	w.Header().Set("x-audiocast-bitrate", strconv.Itoa(mount.BitRate))
-	w.Header().Set("x-audiocast-description", mount.Description)
+	w.Header().Set("X-Audiocast-Name", mount.Name)
+	w.Header().Set("X-Audiocast-Genre", mount.Genre)
+	w.Header().Set("X-Audiocast-Url", mount.StreamURL)
+	w.Header().Set("X-Audiocast-Public", "0")
+	w.Header().Set("X-Audiocast-Description", mount.Description)
 	if icymeta {
 		w.Header().Set("icy-metaint", strconv.Itoa(mount.State.MetaInfo.MetaInt))
 	}
@@ -147,7 +146,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 	for {
 		//check, if server has to be stopped
-		if atomic.LoadInt32(&i.Started) == 0 {
+		if n%2 == 0 && atomic.LoadInt32(&i.Started) == 0 {
 			break
 		}
 
@@ -158,19 +157,17 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		pack.Lock()
 		if icymeta {
 			//check, if metainfo changed
-			if mount.metaInfoChanged(metaCounter) {
-				meta, metaCounter = mount.getIcyMeta()
+			if n%2 == 0 && mount.metaInfoChanged(metaCounter) {
+				meta, metalen, metaCounter = mount.getIcyMeta()
 			}
-			metalen = len(meta)
-			packlen = pack.len
 
-			if nometabytes+packlen+delta > mount.State.MetaInfo.MetaInt {
+			if nometabytes+pack.len+delta > mount.State.MetaInfo.MetaInt {
 				offset = mount.State.MetaInfo.MetaInt - nometabytes - delta
 
 				//log.Printf("*** write block with meta ***")
 				//log.Printf("   offset = %d - %d(nometabytes) - %d (delta) = %d", mount.State.MetaInfo.MetaInt, nometabytes, delta, offset)
 
-				if offset < 0 || offset >= packlen {
+				if offset < 0 || offset >= pack.len {
 					i.printError(3, "Bad metainfo offset %d", offset)
 					log.Printf("!!! Bad metainfo offset %d ***", offset)
 					offset = 0
