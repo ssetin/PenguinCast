@@ -68,9 +68,10 @@ func TestMonitoringListenersCount(b *testing.T) {
 }
 
 func TestDump(b *testing.T) {
+	time.Sleep(time.Second * 5)
 	cl := &iceclient.PenguinClient{}
 	cl.Init(hostAddr, mountName, "dump/dump2.mp3")
-	cl.Listen(15)
+	cl.Listen(35)
 }
 
 // ================================== Benchmarks ===========================================
@@ -138,7 +139,7 @@ func BenchmarkNone(b *testing.B) {
 	go tool pprof main.test block.out
 
 	go test -v -run MonitoringListenersCount -timeout 10m main_test.go
-	go test -v -run Dump main_test.go
+	go test -v -timeout 60s -run Dump main_test.go
 
 	go-torch main.test cpu.out
 

@@ -92,6 +92,7 @@ func (p *PenguinClient) getMountInfo(reader *bufio.Reader) error {
 func (p *PenguinClient) Listen(secToListen int) error {
 	var err error
 	p.conn, err = net.Dial("tcp", p.host)
+
 	if err != nil {
 		return err
 	}
@@ -133,7 +134,7 @@ func (p *PenguinClient) Listen(secToListen int) error {
 			p.dumpFile.Write(sndBuff[:n])
 		}
 		readedBytes += n
-		time.Sleep(time.Millisecond * 101)
+		time.Sleep(time.Millisecond * 500)
 	}
 
 	return nil

@@ -209,6 +209,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 				i.printError(1, "readMount "+err.Error())
 			}
 			time.Sleep(1000 * time.Millisecond)
+
 		}
 
 		nextpack = pack.Next()
