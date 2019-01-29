@@ -75,12 +75,12 @@ func (q *BufElement) IsLocked() bool {
 //***************************************
 
 //Init - initiates buffer queue
-func (q *BufferQueue) Init(maxsize int) {
+func (q *BufferQueue) Init(minsize int) {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	q.size = 0
-	q.maxBufferSize = maxsize
-	q.minBufferSize = 7
+	q.maxBufferSize = minsize * 3
+	q.minBufferSize = minsize
 	q.first = nil
 	q.last = nil
 }
@@ -151,7 +151,7 @@ func (q *BufferQueue) Start(burstSize int) *BufElement {
 	}
 
 	for {
-		if t.prev == nil || burst >= burstSize {
+		if t.prev == nil || burst > burstSize {
 			break
 		}
 		burst += t.len

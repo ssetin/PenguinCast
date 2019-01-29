@@ -47,8 +47,6 @@ func (p *ProcStatsReader) Init() error {
 	p.mux.Lock()
 	defer p.mux.Unlock()
 	p.Pid = os.Getpid()
-	//p.clkTck = 100
-	//p.pageSize = 4096
 
 	p.clkTck = float64(C.sysconf(C._SC_CLK_TCK))
 	p.pageSize = int(C.sysconf(C._SC_PAGESIZE))

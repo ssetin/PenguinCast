@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"path"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -104,13 +103,11 @@ func (i *IceServer) initMounts() error {
 
 func (i *IceServer) incListeners() {
 	atomic.AddInt32(&i.ListenersCount, 1)
-	runtime.Gosched()
 }
 
 func (i *IceServer) decListeners() {
 	if atomic.LoadInt32(&i.ListenersCount) > 0 {
 		atomic.AddInt32(&i.ListenersCount, -1)
-		runtime.Gosched()
 	}
 }
 
@@ -124,13 +121,11 @@ func (i *IceServer) checkListeners() bool {
 
 func (i *IceServer) incSources() {
 	atomic.AddInt32(&i.SourcesCount, 1)
-	runtime.Gosched()
 }
 
 func (i *IceServer) decSources() {
 	if atomic.LoadInt32(&i.SourcesCount) > 0 {
 		atomic.AddInt32(&i.SourcesCount, -1)
-		runtime.Gosched()
 	}
 }
 
@@ -182,20 +177,6 @@ func (i *IceServer) checkIsCommand(page string, r *http.Request) int {
 	return -1
 }
 
-func (i *IceServer) saySourceHello(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Server", i.serverName+"/"+i.version)
-	w.Header().Set("Connection", "Keep-Alive")
-	w.Header().Set("Allow", "GET, SOURCE")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Transfer-Encoding", "chunked")
-	w.WriteHeader(http.StatusOK)
-
-	flusher, _ := w.(http.Flusher)
-	flusher.Flush()
-}
-
 func (i *IceServer) handler(w http.ResponseWriter, r *http.Request) {
 	if i.Props.Logging.Loglevel == 4 {
 		i.logHeaders(w, r)
@@ -239,6 +220,13 @@ func (i *IceServer) runCommand(idx int, w http.ResponseWriter, r *http.Request) 
 
 }
 
+func (i *IceServer) wrapHandlerWithStreaming(wrappedHandler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		//streamWriter := newStreamResponseWritter(w)
+		wrappedHandler.ServeHTTP(w, req)
+	})
+}
+
 /*Start - start listening port ...*/
 func (i *IceServer) Start() {
 	if atomic.LoadInt32(&i.Started) == 1 {
@@ -258,6 +246,8 @@ func (i *IceServer) Start() {
 		})
 	}
 
+	//streamedHandler := i.wrapHandlerWithStreaming(http.HandlerFunc(i.handler))
+	//http.Handle("/", streamedHandler)
 	http.HandleFunc("/", i.handler)
 
 	go func() {
