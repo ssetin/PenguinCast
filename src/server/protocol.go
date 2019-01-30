@@ -140,7 +140,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		return
 	}
 
-	bufrw := bufio.NewWriterSize(conn, 1024*mount.BitRate/8)
+	bufrw := bufio.NewWriterSize(conn, 4096) //2*1024*mount.BitRate/8)
 
 	mount.sayListenerHello(bufrw, icymeta)
 
@@ -204,10 +204,10 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 		// collect burst data in buffer whithout flashing
 		if bytessended >= mount.BurstSize {
-			/*err = bufrw.Flush()
+			//err = bufrw.Flush()
 			if err != nil {
 				i.printError(1, "readMount "+err.Error())
-			}*/
+			}
 			//time.Sleep(1000 * time.Millisecond)
 
 		}
@@ -226,7 +226,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		}*/
 		//idle = 0
 		for nextpack == nil {
-			time.Sleep(time.Millisecond * 500)
+			time.Sleep(time.Millisecond * 250)
 			nextpack = pack.Next()
 		}
 		pack.UnLock()
