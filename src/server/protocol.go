@@ -100,7 +100,8 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 	bytessended := 0
 	writed := 0
-	//idle := 0
+	idle := 0
+	idleTimeOut := 1000 * i.Props.Limits.SourceIdleTimeOut
 	offset := 0
 	nometabytes := 0
 	partwrited := 0
@@ -127,7 +128,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	w.Header().Set("X-Audiocast-Public", "0")
 	w.Header().Set("X-Audiocast-Description", mount.Description)
 	if icymeta {
-		w.Header().Set("icy-metaint", strconv.Itoa(mount.State.MetaInfo.MetaInt))
+		w.Header().Set("Icy-Metaint", strconv.Itoa(mount.State.MetaInfo.MetaInt))
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -208,19 +209,16 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		nextpack = pack.Next()
 		for nextpack == nil {
 			time.Sleep(time.Millisecond * 500)
+			idle += 500
 			nextpack = pack.Next()
-		}
-		pack.UnLock()
-		/*if nextpack == nil {
-			idle++
-			if idle >= i.Props.Limits.EmptyBufferIdleTimeOut {
+			if idle >= idleTimeOut {
 				i.printError(1, "Empty Buffer idle time is reached")
 				break
 			}
-			continue
-		} else {
-			idle = 0
-		}*/
+		}
+		idle = 0
+		pack.UnLock()
+
 		pack = nextpack
 	}
 }
