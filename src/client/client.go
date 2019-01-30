@@ -134,7 +134,7 @@ func (p *PenguinClient) Listen(secToListen int) error {
 			p.dumpFile.Write(sndBuff[:n])
 		}
 		readedBytes += n
-		time.Sleep(time.Millisecond * 500)
+		time.Sleep(time.Millisecond * 200)
 	}
 
 	return nil
