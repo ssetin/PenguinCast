@@ -47,26 +47,26 @@ func (q *BufElement) Clear() {
 	q.buffer = nil
 }
 
-//Next ...
+//Next - getting next element
 func (q *BufElement) Next() *BufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	return q.next
 }
 
-//Lock ...
+//Lock - mark element as used by listener
 func (q *BufElement) Lock() {
-	atomic.StoreInt32(&q.locked, 1)
+	atomic.AddInt32(&q.locked, 1)
 }
 
-//UnLock ...
+//UnLock -  mark element as unused by listener
 func (q *BufElement) UnLock() {
-	atomic.StoreInt32(&q.locked, 0)
+	atomic.AddInt32(&q.locked, -1)
 }
 
 //IsLocked (logical lock, mean it's in use)
 func (q *BufElement) IsLocked() bool {
-	if atomic.LoadInt32(&q.locked) == 0 {
+	if atomic.LoadInt32(&q.locked) <= 0 {
 		return false
 	}
 	return true
@@ -75,12 +75,12 @@ func (q *BufElement) IsLocked() bool {
 //***************************************
 
 //Init - initiates buffer queue
-func (q *BufferQueue) Init(maxsize int) {
+func (q *BufferQueue) Init(minsize int) {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	q.size = 0
-	q.maxBufferSize = maxsize
-	q.minBufferSize = 7
+	q.maxBufferSize = minsize * 3
+	q.minBufferSize = minsize
 	q.first = nil
 	q.last = nil
 }

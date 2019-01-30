@@ -202,7 +202,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		// collect burst data in buffer whithout flashing
 		if bytessended >= mount.BurstSize {
 			flusher.Flush()
-			//time.Sleep(1000 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 		}
 
 		nextpack = pack.Next()
