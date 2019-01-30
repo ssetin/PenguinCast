@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log"
 	"strconv"
 	"sync"
@@ -55,7 +56,7 @@ func TestMonitoringListenersCount(b *testing.T) {
 					cl.Init(hostAddr, mountName, "")
 				}
 				err := cl.Listen(secToListen)
-				if err != nil {
+				if err != nil && err != io.EOF {
 					log.Println(err)
 				}
 			}(wg, i*incStep+k)
@@ -92,7 +93,7 @@ func BenchmarkGeneral(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		err := cl.Listen(2)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			log.Println(err)
 		}
 	}
@@ -112,7 +113,7 @@ func BenchmarkParallel(b *testing.B) {
 				cl := &iceclient.PenguinClient{}
 				cl.Init(hostAddr, mountName, "")
 				err := cl.Listen(120)
-				if err != nil {
+				if err != nil && err != io.EOF {
 					log.Println(err)
 				}
 			}(wg, i)

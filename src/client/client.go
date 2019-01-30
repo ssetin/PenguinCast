@@ -53,7 +53,7 @@ func (p *PenguinClient) Init(host string, mount string, dump string) error {
 func (p *PenguinClient) sayHello(writer *bufio.Writer) error {
 	writer.WriteString("GET /")
 	writer.WriteString(p.mount)
-	writer.WriteString(" HTTP/1.0\r\nicy-metadata: 0\r\nuser-agent: ")
+	writer.WriteString(" HTTP/1.0\r\nicy-metadata: 1\r\nuser-agent: ")
 	writer.WriteString(cClientName)
 	writer.WriteString("/")
 	writer.WriteString(cVersion)
@@ -125,7 +125,7 @@ func (p *PenguinClient) Listen(secToListen int) error {
 	sndBuff := make([]byte, 1024*p.bitRate/8)
 
 	for readedBytes <= bytesToFinish {
-		n, err := reader.Read(sndBuff)
+		n, err := p.conn.Read(sndBuff)
 		if err != nil {
 			return err
 		}
@@ -134,7 +134,7 @@ func (p *PenguinClient) Listen(secToListen int) error {
 			p.dumpFile.Write(sndBuff[:n])
 		}
 		readedBytes += n
-		time.Sleep(time.Millisecond * 200)
+		time.Sleep(time.Millisecond * 500)
 	}
 
 	return nil

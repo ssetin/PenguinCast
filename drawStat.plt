@@ -26,7 +26,7 @@ set ytics nomirror
 # CPU
 set y2label 'Usage, %'
 set y2range [0:100]
-set y2tics nomirror
+set y2tics 5 nomirror
 set autoscale y
 #set autoscale y2
 

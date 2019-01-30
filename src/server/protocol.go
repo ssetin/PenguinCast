@@ -89,6 +89,11 @@ func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (i *IceServer) closeAndUnlock(pack *BufElement, err error) {
+	i.printError(1, "readMount "+err.Error())
+	pack.UnLock()
+}
+
 /*
 	readMount
 	Send stream from requested mount to client
@@ -102,13 +107,15 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 	bytessended := 0
 	writed := 0
-	//idle := 0
+	idle := 0
+	idleTimeOut := i.Props.Limits.EmptyBufferIdleTimeOut * 1000
 	offset := 0
 	nometabytes := 0
 	partwrited := 0
 	metaCounter = -1
 	nmtmp := 0
 	delta := 0
+	beginIteration := time.Now()
 	metalen := 0
 	n := 0
 
@@ -140,7 +147,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		return
 	}
 
-	bufrw := bufio.NewWriterSize(conn, 4096) //2*1024*mount.BitRate/8)
+	bufrw := bufio.NewWriterSize(conn, 4096) //1024*mount.BitRate/8)
 
 	mount.sayListenerHello(bufrw, icymeta)
 
@@ -148,6 +155,8 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	mount.incListeners()
 
 	for {
+		beginIteration = time.Now()
+		//conn.SetWriteDeadline(time.Now().Add(time.Second * 5))
 		//check, if server has to be stopped
 		if atomic.LoadInt32(&i.Started) == 0 {
 			break
@@ -174,10 +183,22 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 				}
 
 				partwrited, err = bufrw.Write(pack.buffer[:offset])
+				if err != nil {
+					i.closeAndUnlock(pack, err)
+					break
+				}
 				writed += partwrited
 				partwrited, err = bufrw.Write(meta)
+				if err != nil {
+					i.closeAndUnlock(pack, err)
+					break
+				}
 				writed += partwrited
 				partwrited, err = bufrw.Write(pack.buffer[offset:])
+				if err != nil {
+					i.closeAndUnlock(pack, err)
+					break
+				}
 				writed += partwrited
 
 				delta = writed - offset - metalen
@@ -195,8 +216,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		}
 
 		if err != nil {
-			i.printError(1, "%d readMount "+err.Error(), n)
-			pack.UnLock()
+			i.closeAndUnlock(pack, err)
 			break
 		}
 
@@ -204,31 +224,26 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 		// collect burst data in buffer whithout flashing
 		if bytessended >= mount.BurstSize {
-			//err = bufrw.Flush()
-			if err != nil {
-				i.printError(1, "readMount "+err.Error())
+			//bufrw.Flush()
+			//log.Printf("iter=%f msec, sleep=%f\n", time.Since(beginIteration).Seconds(), time.Duration(1000*time.Millisecond-time.Since(beginIteration)).Seconds())
+			if time.Since(beginIteration) < time.Second {
+				time.Sleep(time.Second - time.Since(beginIteration))
 			}
-			//time.Sleep(1000 * time.Millisecond)
-
 		}
 
 		nextpack = pack.Next()
 
-		/*if nextpack == nil {
-			idle++
-			if idle >= i.Props.Limits.EmptyBufferIdleTimeOut {
+		for nextpack == nil {
+			time.Sleep(time.Millisecond * 250)
+			idle += 250
+			nextpack = pack.Next()
+			log.Printf("no next pack. waiting %d", idle)
+			if idle >= idleTimeOut {
 				i.printError(1, "Empty Buffer idle time is reached")
 				break
 			}
-			continue
-		} else {
-			idle = 0
-		}*/
-		//idle = 0
-		for nextpack == nil {
-			time.Sleep(time.Millisecond * 250)
-			nextpack = pack.Next()
 		}
+		idle = 0
 		pack.UnLock()
 		pack = nextpack
 	}
