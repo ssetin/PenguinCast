@@ -100,7 +100,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 	bytessended := 0
 	writed := 0
-	idle := 0
+	//idle := 0
 	offset := 0
 	nometabytes := 0
 	partwrited := 0
@@ -146,18 +146,15 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 	for {
 		//check, if server has to be stopped
-		if n%2 == 0 && atomic.LoadInt32(&i.Started) == 0 {
+		if atomic.LoadInt32(&i.Started) == 0 {
 			break
 		}
-
-		//junk := make([]byte, 99999999)
-		//w.Write(junk)
 
 		n++
 		pack.Lock()
 		if icymeta {
 			//check, if metainfo changed
-			if n%2 == 0 && mount.metaInfoChanged(metaCounter) {
+			if mount.metaInfoChanged(metaCounter) {
 				meta, metalen, metaCounter = mount.getIcyMeta()
 			}
 
@@ -205,12 +202,16 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		// collect burst data in buffer whithout flashing
 		if bytessended >= mount.BurstSize {
 			flusher.Flush()
-			time.Sleep(1000 * time.Millisecond)
+			//time.Sleep(1000 * time.Millisecond)
 		}
 
 		nextpack = pack.Next()
+		for nextpack == nil {
+			time.Sleep(time.Millisecond * 500)
+			nextpack = pack.Next()
+		}
 		pack.UnLock()
-		if nextpack == nil {
+		/*if nextpack == nil {
 			idle++
 			if idle >= i.Props.Limits.EmptyBufferIdleTimeOut {
 				i.printError(1, "Empty Buffer idle time is reached")
@@ -219,7 +220,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 			continue
 		} else {
 			idle = 0
-		}
+		}*/
 		pack = nextpack
 	}
 }
