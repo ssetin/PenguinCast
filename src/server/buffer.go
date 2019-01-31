@@ -11,6 +11,7 @@ type BufElement struct {
 	locked int32
 	len    int
 	buffer []byte
+	pool   *sync.Pool
 	next   *BufElement
 	prev   *BufElement
 	mux    sync.Mutex
@@ -33,38 +34,63 @@ type BufferInfo struct {
 	InUse     int
 }
 
-// NewBufElement - returns new buffer element (page)
-func NewBufElement() *BufElement {
-	return &BufElement{}
+var pages16kPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 16384)
+	},
 }
 
-//Clear ...
-func (q *BufElement) Clear() {
+var pages32kPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 32768)
+	},
+}
+
+// NewBufElement - returns new buffer element (page)
+func NewBufElement(buffer []byte, readed int) *BufElement {
+	t := &BufElement{}
+
+	if readed >= 32768 {
+		t.pool = &pages32kPool
+	} else {
+		t.pool = &pages16kPool
+	}
+
+	t.buffer = t.pool.Get().([]byte)
+	t.buffer = t.buffer[:readed]
+	t.len = readed
+	copy(t.buffer, buffer)
+	return t
+}
+
+// Reset ...
+func (q *BufElement) Reset() {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	q.len = 0
 	q.locked = 0
-	q.buffer = nil
+	q.buffer = q.buffer[:0]
+	q.pool.Put(q.buffer)
 }
 
-//Next - getting next element
+// Next - getting next element
 func (q *BufElement) Next() *BufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	return q.next
 }
 
-//Lock - mark element as used by listener
+// Lock - mark element as used by listener
 func (q *BufElement) Lock() {
 	atomic.AddInt32(&q.locked, 1)
 }
 
-//UnLock -  mark element as unused by listener
+// UnLock -  mark element as unused by listener
 func (q *BufElement) UnLock() {
 	atomic.AddInt32(&q.locked, -1)
 }
 
-//IsLocked (logical lock, mean it's in use)
+// IsLocked (logical lock, mean it's in use)
 func (q *BufElement) IsLocked() bool {
 	if atomic.LoadInt32(&q.locked) <= 0 {
 		return false
@@ -74,7 +100,7 @@ func (q *BufElement) IsLocked() bool {
 
 //***************************************
 
-//Init - initiates buffer queue
+// Init - initiates buffer queue
 func (q *BufferQueue) Init(minsize int) {
 	q.mux.Lock()
 	defer q.mux.Unlock()
@@ -85,7 +111,7 @@ func (q *BufferQueue) Init(minsize int) {
 	q.last = nil
 }
 
-//Size - returns buffer queue size
+// Size - returns buffer queue size
 func (q *BufferQueue) Size() int {
 	q.mux.Lock()
 	defer q.mux.Unlock()
@@ -124,21 +150,21 @@ func (q *BufferQueue) Info() BufferInfo {
 	return result
 }
 
-//First - returns the first element in buffer queue
+// First - returns the first element in buffer queue
 func (q *BufferQueue) First() *BufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	return q.first
 }
 
-//Last - returns the last element in buffer queue
+// Last - returns the last element in buffer queue
 func (q *BufferQueue) Last() *BufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	return q.last
 }
 
-//Start - returns the element to start with
+// Start - returns the element to start with
 func (q *BufferQueue) Start(burstSize int) *BufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
@@ -171,9 +197,9 @@ func (q *BufferQueue) checkAndTruncate() {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	var t *BufElement
-	t = q.first
 
 	for {
+		t = q.first
 		if t == nil || q.size <= 1 {
 			break
 		}
@@ -184,26 +210,21 @@ func (q *BufferQueue) checkAndTruncate() {
 				if q.size <= q.minBufferSize {
 					break
 				}
-				t.next.prev.buffer = nil
-				t.next.prev = nil
 				q.first = t.next
+				t.Reset()
+				t.next.prev = nil
+				t.prev = nil
 				q.size--
 			} else {
 				break
 			}
 		}
-		t = t.next
 	}
-
 }
 
-//Append - appends new page to the end of the buffer queue
+// Append - appends new page to the end of the buffer queue
 func (q *BufferQueue) Append(buffer []byte, readed int) {
-	t := NewBufElement()
-
-	t.buffer = make([]byte, readed)
-	t.len = readed
-	copy(t.buffer, buffer)
+	t := NewBufElement(buffer, readed)
 
 	q.mux.Lock()
 	defer q.mux.Unlock()

@@ -17,8 +17,8 @@ var IcySrv iceserver.IceServer
 // ================================== Setup ========================================
 const (
 	runServer      = true
-	listenersCount = 8000 // total number of listeners
-	incStep        = 500  // number of listeners, to increase with each step
+	listenersCount = 5000 // total number of listeners
+	incStep        = 50   // number of listeners, to increase with each step
 	waitStep       = 5    // seconds between each step
 	secToListen    = 220  // seconds to listen by each connection
 	mountName      = "RockRadio96"
@@ -50,7 +50,7 @@ func TestMonitoringListenersCount(b *testing.T) {
 				defer wg.Done()
 				time.Sleep(time.Millisecond * 200)
 				cl := &iceclient.PenguinClient{}
-				if i < 10 {
+				if i < 0 {
 					cl.Init(hostAddr, mountName, "dump/"+mountName+"."+strconv.Itoa(i)+".mp3")
 				} else {
 					cl.Init(hostAddr, mountName, "")
@@ -127,13 +127,13 @@ func BenchmarkParallel(b *testing.B) {
 
 func BenchmarkNone(b *testing.B) {
 	log.Println("Waiting for listeners...")
-	time.Sleep(time.Second * 660)
+	time.Sleep(time.Second * 800)
 }
 
 /*
 	go test -bench General  -benchmem -benchtime 120s -cpuprofile=cpu.out -memprofile=mem.out main_test.go -run notests
 	go test -bench Parallel -race -benchmem -cpuprofile=cpu.out -memprofile=mem.out main_test.go -run notests
-	go test -bench None -benchmem -timeout 13m -cpuprofile=cpu.out -memprofile=mem.out main_test.go -run notests
+	go test -bench None -benchmem -timeout 20m -cpuprofile=cpu.out -memprofile=mem.out main_test.go -run notests
 
 	go tool pprof main.test cpu.out
 	go tool pprof -alloc_objects main.test mem.out

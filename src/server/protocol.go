@@ -3,15 +3,15 @@ package iceserver
 
 /*
 	TODO:
-	- readMount  write frame timeout
-	- readMount  kill a lagging client
 */
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -90,7 +90,12 @@ func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 }
 
 func (i *IceServer) closeAndUnlock(pack *BufElement, err error) {
-	i.printError(1, "readMount "+err.Error())
+	if te, ok := err.(net.Error); ok && te.Timeout() {
+		log.Println("Write timeout")
+		i.printError(1, "Write timeout")
+	} else {
+		i.printError(1, err.Error())
+	}
 	pack.UnLock()
 }
 
@@ -126,12 +131,14 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		return
 	}
 
-	conn, _, err := hj.Hijack()
+	conn, bufrw, err := hj.Hijack()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer conn.Close()
+	//conn.(*net.TCPConn).SetNoDelay(false)
+	//conn.(*net.TCPConn).SetWriteBuffer(256)
 
 	start := time.Now()
 	mount = &i.Props.Mounts[idx]
@@ -147,7 +154,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		return
 	}
 
-	bufrw := bufio.NewWriterSize(conn, 4096) //1024*mount.BitRate/8)
+	//bufrw := bufio.NewWriterSize(conn, 1024*mount.BitRate/8)
 
 	mount.sayListenerHello(bufrw, icymeta)
 
@@ -156,7 +163,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 	for {
 		beginIteration = time.Now()
-		//conn.SetWriteDeadline(time.Now().Add(time.Second * 5))
+		conn.SetWriteDeadline(time.Now().Add(time.Second * 5))
 		//check, if server has to be stopped
 		if atomic.LoadInt32(&i.Started) == 0 {
 			break
@@ -222,10 +229,8 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 		bytessended += writed + nmtmp
 
-		// collect burst data in buffer whithout flashing
+		// send burst data whithout waiting
 		if bytessended >= mount.BurstSize {
-			//bufrw.Flush()
-			//log.Printf("iter=%f msec, sleep=%f\n", time.Since(beginIteration).Seconds(), time.Duration(1000*time.Millisecond-time.Since(beginIteration)).Seconds())
 			if time.Since(beginIteration) < time.Second {
 				time.Sleep(time.Second - time.Since(beginIteration))
 			}
@@ -236,12 +241,11 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		for nextpack == nil {
 			time.Sleep(time.Millisecond * 250)
 			idle += 250
-			nextpack = pack.Next()
-			log.Printf("no next pack. waiting %d", idle)
 			if idle >= idleTimeOut {
-				i.printError(1, "Empty Buffer idle time is reached")
+				i.closeAndUnlock(pack, errors.New("Empty Buffer idle time is reached"))
 				break
 			}
+			nextpack = pack.Next()
 		}
 		idle = 0
 		pack.UnLock()

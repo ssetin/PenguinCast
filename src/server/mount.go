@@ -168,7 +168,7 @@ func (m *Mount) getParams(paramstr string) map[string]string {
 	return params
 }
 
-func (m *Mount) sayListenerHello(w *bufio.Writer, icymeta bool) {
+func (m *Mount) sayListenerHello(w *bufio.ReadWriter, icymeta bool) {
 	w.WriteString("HTTP/1.0 200 OK\r\n")
 	w.WriteString("Server: ")
 	w.WriteString(m.Server.serverName)
@@ -277,9 +277,9 @@ func (m *Mount) getMountsInfo() MountInfo {
 	t.Name = m.Name
 	if m.State.Started {
 		t.UpTime = fmtDuration(time.Since(m.State.StartedTime))
+		t.Buff = m.buffer.Info()
 	}
 	m.mux.Unlock()
-	t.Buff = m.buffer.Info()
 	return t
 }
 
