@@ -137,8 +137,6 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		return
 	}
 	defer conn.Close()
-	//conn.(*net.TCPConn).SetNoDelay(false)
-	//conn.(*net.TCPConn).SetWriteBuffer(256)
 
 	start := time.Now()
 	mount = &i.Props.Mounts[idx]

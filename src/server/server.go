@@ -45,6 +45,7 @@ type IceServer struct {
 	memUsage int
 
 	srv           *http.Server
+	poolManager   PoolManager
 	logError      *log.Logger
 	logErrorFile  *os.File
 	logAccess     *log.Logger
