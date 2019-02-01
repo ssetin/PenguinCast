@@ -127,10 +127,7 @@ func (p *PenguinClient) Listen(secToListen int) error {
 	sndBuff := make([]byte, 1024*p.bitRate/8)
 
 	for readedBytes <= bytesToFinish {
-<<<<<<< HEAD
-=======
 		beginIteration = time.Now()
->>>>>>> netconn
 		n, err := p.conn.Read(sndBuff)
 		if err != nil {
 			return err
@@ -140,18 +137,12 @@ func (p *PenguinClient) Listen(secToListen int) error {
 			p.dumpFile.Write(sndBuff[:n])
 		}
 		readedBytes += n
-<<<<<<< HEAD
-		time.Sleep(time.Millisecond * 500)
-=======
+
 		iterTime = time.Since(beginIteration)
 
 		if iterTime > time.Millisecond*4000 {
-			log.Printf("iter=%f msec, sleep=%f\n", iterTime.Seconds(), time.Duration(time.Second-iterTime).Seconds())
+			log.Printf("iter=%f sec", iterTime.Seconds())
 		}
-		if time.Since(beginIteration) < time.Second {
-			time.Sleep(time.Second - time.Since(beginIteration))
-		}
->>>>>>> netconn
 	}
 
 	return nil
