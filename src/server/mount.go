@@ -2,6 +2,7 @@
 package iceserver
 
 import (
+	"bufio"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -68,7 +68,8 @@ func (m *Mount) Init(srv *IceServer) error {
 	m.Server = srv
 	m.Clear()
 	m.State.MetaInfo.MetaInt = m.BitRate * 1024 / 8 * 10
-	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8) + 2)
+	pool := m.Server.poolManager.Init(m.BitRate * 1024 / 8)
+	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8)+2, pool)
 	if m.DumpFile > "" {
 		var err error
 		m.dumpFile, err = os.OpenFile(srv.Props.Paths.Log+m.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
@@ -108,26 +109,23 @@ func (m *Mount) metaInfoChanged(val int32) bool {
 
 func (m *Mount) incListeners() {
 	atomic.AddInt32(&m.State.Listeners, 1)
-	runtime.Gosched()
 }
 
 func (m *Mount) decListeners() {
 	if atomic.LoadInt32(&m.State.Listeners) > 0 {
 		atomic.AddInt32(&m.State.Listeners, -1)
-		runtime.Gosched()
 	}
 }
 
 func (m *Mount) zeroListeners() {
 	atomic.StoreInt32(&m.State.Listeners, 0)
-	runtime.Gosched()
 }
 
 func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 	strAuth := r.Header.Get("authorization")
 
 	if strAuth == "" {
-		m.Server.saySourceHello(w, r)
+		m.saySourceHello(w, r)
 		return errors.New("No authorization field")
 	}
 
@@ -154,7 +152,7 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 		return errors.New("Wrong user or password")
 	}
 
-	m.Server.saySourceHello(w, r)
+	m.saySourceHello(w, r)
 
 	return nil
 }
@@ -169,6 +167,50 @@ func (m *Mount) getParams(paramstr string) map[string]string {
 		params[k] = v
 	}
 	return params
+}
+
+func (m *Mount) sayListenerHello(w *bufio.ReadWriter, icymeta bool) {
+	w.WriteString("HTTP/1.0 200 OK\r\n")
+	w.WriteString("Server: ")
+	w.WriteString(m.Server.serverName)
+	w.WriteString(" ")
+	w.WriteString(m.Server.version)
+	w.WriteString("\r\nContent-Type: ")
+	w.WriteString(m.ContentType)
+	w.WriteString("\r\nConnection: Keep-Alive\r\n")
+	w.WriteString("X-Audiocast-Bitrate: ")
+	w.WriteString(strconv.Itoa(m.BitRate))
+	w.WriteString("\r\nX-Audiocast-Name: ")
+	w.WriteString(m.Name)
+	w.WriteString("\r\nX-Audiocast-Genre: ")
+	w.WriteString(m.Genre)
+	w.WriteString("\r\nX-Audiocast-Url: ")
+	w.WriteString(m.StreamURL)
+	w.WriteString("\r\nX-Audiocast-Public: 0\r\n")
+	w.WriteString("X-Audiocast-Description: ")
+	w.WriteString(m.Description)
+	w.WriteString("\r\n")
+	if icymeta {
+		w.WriteString("Icy-Metaint: ")
+		w.WriteString(strconv.Itoa(m.State.MetaInfo.MetaInt))
+		w.WriteString("\r\n")
+	}
+	w.WriteString("\r\n")
+	w.Flush()
+}
+
+func (m *Mount) saySourceHello(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Server", m.Server.serverName+"/"+m.Server.version)
+	w.Header().Set("Connection", "Keep-Alive")
+	w.Header().Set("Allow", "GET, SOURCE")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Transfer-Encoding", "chunked")
+	w.WriteHeader(http.StatusOK)
+
+	flusher, _ := w.(http.Flusher)
+	flusher.Flush()
 }
 
 func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
@@ -236,9 +278,9 @@ func (m *Mount) getMountsInfo() MountInfo {
 	t.Name = m.Name
 	if m.State.Started {
 		t.UpTime = fmtDuration(time.Since(m.State.StartedTime))
+		t.Buff = m.buffer.Info()
 	}
 	m.mux.Unlock()
-	t.Buff = m.buffer.Info()
 	return t
 }
 

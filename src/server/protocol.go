@@ -3,13 +3,15 @@ package iceserver
 
 /*
 	TODO:
-	- readMount  write frame timeout
 */
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -87,9 +89,19 @@ func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (i *IceServer) closeAndUnlock(pack *BufElement, err error) {
+	if te, ok := err.(net.Error); ok && te.Timeout() {
+		log.Println("Write timeout")
+		i.printError(1, "Write timeout")
+	} else {
+		i.printError(1, err.Error())
+	}
+	pack.UnLock()
+}
+
 /*
 	readMount
-    Send stream from requested mount to client
+	Send stream from requested mount to client
 */
 func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *http.Request) {
 	var mount *Mount
@@ -101,38 +113,36 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	bytessended := 0
 	writed := 0
 	idle := 0
-	idleTimeOut := 1000 * i.Props.Limits.SourceIdleTimeOut
+	idleTimeOut := i.Props.Limits.EmptyBufferIdleTimeOut * 1000
 	offset := 0
 	nometabytes := 0
 	partwrited := 0
 	metaCounter = -1
 	nmtmp := 0
 	delta := 0
+	beginIteration := time.Now()
 	metalen := 0
 	n := 0
+
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		i.printError(1, "webserver doesn't support hijacking")
+		http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
+		return
+	}
+
+	conn, bufrw, err := hj.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer conn.Close()
 
 	start := time.Now()
 	mount = &i.Props.Mounts[idx]
 
 	i.printError(3, "readMount "+mount.Name)
 	defer i.closeMount(idx, false, &bytessended, start, r)
-	defer r.Body.Close()
-
-	w.Header().Set("Server", i.serverName+" "+i.version)
-	w.Header().Set("Content-Type", mount.ContentType)
-	w.Header().Set("X-Audiocast-Bitrate", strconv.Itoa(mount.BitRate))
-	w.Header().Set("Connection", "Keep-Alive")
-	w.Header().Set("X-Audiocast-Name", mount.Name)
-	w.Header().Set("X-Audiocast-Genre", mount.Genre)
-	w.Header().Set("X-Audiocast-Url", mount.StreamURL)
-	w.Header().Set("X-Audiocast-Public", "0")
-	w.Header().Set("X-Audiocast-Description", mount.Description)
-	if icymeta {
-		w.Header().Set("Icy-Metaint", strconv.Itoa(mount.State.MetaInfo.MetaInt))
-	}
-
-	w.WriteHeader(http.StatusOK)
-	flusher, _ := w.(http.Flusher)
 
 	//try to maximize unused buffer pages from begining
 	pack = mount.buffer.Start(mount.BurstSize)
@@ -142,10 +152,16 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 		return
 	}
 
+	//bufrw := bufio.NewWriterSize(conn, 1024*mount.BitRate/8)
+
+	mount.sayListenerHello(bufrw, icymeta)
+
 	i.incListeners()
 	mount.incListeners()
 
 	for {
+		beginIteration = time.Now()
+		conn.SetWriteDeadline(time.Now().Add(time.Second * 5))
 		//check, if server has to be stopped
 		if atomic.LoadInt32(&i.Started) == 0 {
 			break
@@ -166,16 +182,28 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 				//log.Printf("   offset = %d - %d(nometabytes) - %d (delta) = %d", mount.State.MetaInfo.MetaInt, nometabytes, delta, offset)
 
 				if offset < 0 || offset >= pack.len {
-					i.printError(3, "Bad metainfo offset %d", offset)
+					i.printError(2, "Bad metainfo offset %d", offset)
 					log.Printf("!!! Bad metainfo offset %d ***", offset)
 					offset = 0
 				}
 
-				partwrited, err = w.Write(pack.buffer[:offset])
+				partwrited, err = bufrw.Write(pack.buffer[:offset])
+				if err != nil {
+					i.closeAndUnlock(pack, err)
+					break
+				}
 				writed += partwrited
-				partwrited, err = w.Write(meta)
+				partwrited, err = bufrw.Write(meta)
+				if err != nil {
+					i.closeAndUnlock(pack, err)
+					break
+				}
 				writed += partwrited
-				partwrited, err = w.Write(pack.buffer[offset:])
+				partwrited, err = bufrw.Write(pack.buffer[offset:])
+				if err != nil {
+					i.closeAndUnlock(pack, err)
+					break
+				}
 				writed += partwrited
 
 				delta = writed - offset - metalen
@@ -185,36 +213,36 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 				//log.Printf("   delta = %d(writed) - %d(offset) - %d(metalen) = %d", writed, offset, metalen, delta)
 			} else {
 				writed = 0
-				nmtmp, err = w.Write(pack.buffer)
+				nmtmp, err = bufrw.Write(pack.buffer)
 				nometabytes += nmtmp
 			}
 		} else {
-			writed, err = w.Write(pack.buffer)
+			writed, err = bufrw.Write(pack.buffer)
 		}
 
 		if err != nil {
-			i.printError(1, "%d readMount "+err.Error(), n)
-			pack.UnLock()
+			i.closeAndUnlock(pack, err)
 			break
 		}
 
 		bytessended += writed + nmtmp
 
-		// collect burst data in buffer whithout flashing
+		// send burst data whithout waiting
 		if bytessended >= mount.BurstSize {
-			flusher.Flush()
-			time.Sleep(1000 * time.Millisecond)
+			if time.Since(beginIteration) < time.Second {
+				time.Sleep(time.Second - time.Since(beginIteration))
+			}
 		}
 
 		nextpack = pack.Next()
 		for nextpack == nil {
-			time.Sleep(time.Millisecond * 500)
-			idle += 500
-			nextpack = pack.Next()
+			time.Sleep(time.Millisecond * 250)
+			idle += 250
 			if idle >= idleTimeOut {
-				i.printError(1, "Empty Buffer idle time is reached")
+				i.closeAndUnlock(pack, errors.New("Empty Buffer idle time is reached"))
 				break
 			}
+			nextpack = pack.Next()
 		}
 		idle = 0
 		pack.UnLock()
@@ -225,7 +253,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 /*
 	writeMount
-    Authenticate SOURCE and write stream from it to appropriate mount buffer
+	Authenticate SOURCE and write stream from it to appropriate mount buffer
 */
 func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) {
 	var mount *Mount
@@ -265,15 +293,17 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	conn, bufrw, err := hj.Hijack()
+	conn, _, err := hj.Hijack()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer conn.Close()
 
+	bufrw := bufio.NewReaderSize(conn, 1024*mount.BitRate/8)
+
 	i.incSources()
-	// max bytes per second according to bitrateclear
+	// max bytes per second according to bitrate
 	buff := make([]byte, mount.BitRate*1024/8)
 
 	for {
