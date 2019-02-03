@@ -1,5 +1,4 @@
 # PenguinCast
-In the development process, still a lot of work
 
 Icecast compatible streaming audio server - server part of your internet radio station.
 
@@ -22,7 +21,7 @@ Configuration parameters are stored in config.json.
     "Socket": { "Port": 8008},
     "Limits": {
         "Clients": 30, "Sources": 5, 
-        "SourceIdleTimeOut": 5, "EmptyBufferIdleTimeOut": 5
+        "SourceIdleTimeOut": 5, "EmptyBufferIdleTimeOut": 5, "WriteTimeOut": 10
     },
     "Auth": {"AdminPassword": "admin"},
     "Paths": {"Log": "log/", "Web":"html/"},
@@ -49,6 +48,7 @@ Configuration parameters are stored in config.json.
 - Sources - maximum Sources per server
 - SourceIdleTimeOut - data timeout for source
 - EmptyBufferIdleTimeOut - silence timeout for client
+- WriteTimeOut - timeout for writing data to client connection
 
 #### Mounts
 - Name - required, mount point name
@@ -68,3 +68,15 @@ Configuration parameters are stored in config.json.
     - 4 - Debug
 - UseMonitor - activate online monitoring of server state
 - UseStat - collect and save listeners count, cpu and memory usage to file log/stat.log
+
+
+## Load testing
+I did'nt have a goal to measure the maximum number of listeners, but only to look at the overall picture of working server. The server has been tested for CPU and memory usage. For testing i used a simplified version of the client, which connects to the server and writes the resulting stream to files (first 30 listeners). Two test scripts was launched on two machines and create a new connections every 5 seconds until the number of listeners is not reached 13 thousand. Each connection listened the stream for 1:30 hour and then shuted down. Meanwhile, CPU and memory usage statistics collection has been enabled on PenguinCast and based on these data the following chart was constructed. After the test was completed, the resulting dump files were tested by mp3check for errors.
+
+Radio server was broadcasting 96 Kb/s mp3 stream and also acted as listeners generator.  
+
+Server: Core2Duo E7500 2.93GHz, 4 GB RAM, Ubuntu Desktop 18.04  
+Another listeners generator: Intel Celeron(R) G540 2.50GHz, 1GB RAM, Ubuntu Server 18.04  
+All machines placed in gigabit local network.  
+
+![Load test](stat01.png)

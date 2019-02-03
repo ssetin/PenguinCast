@@ -35,6 +35,7 @@ type ProcStatsReader struct {
 	Pid      int
 	clkTck   float64
 	pageSize int
+	numCPU   int
 
 	mux  sync.Mutex
 	prev ProcStats
@@ -50,6 +51,7 @@ func (p *ProcStatsReader) Init() error {
 
 	p.clkTck = float64(C.sysconf(C._SC_CLK_TCK))
 	p.pageSize = int(C.sysconf(C._SC_PAGESIZE))
+	p.numCPU = int(C.sysconf(C._SC_NPROCESSORS_ONLN))
 
 	procFile, err := os.Open(fmt.Sprintf("/proc/%d/stat", p.Pid))
 	if err != nil {
@@ -160,7 +162,7 @@ func (p *ProcStatsReader) GetCPUAndMem() (float64, int, error) {
 			seconds = 1
 		}
 
-		CPU = (total / seconds) * 100
+		CPU = (total / seconds) * 100 / float64(p.numCPU)
 		Memory = stat.Rss * p.pageSize
 
 		p.mux.Lock()

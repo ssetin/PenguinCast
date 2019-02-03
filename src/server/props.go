@@ -22,6 +22,7 @@ type Properties struct {
 		Sources                int32 `json:"Sources"`
 		SourceIdleTimeOut      int   `json:"SourceIdleTimeOut"`
 		EmptyBufferIdleTimeOut int   `json:"EmptyBufferIdleTimeOut"`
+		WriteTimeOut           int   `json:"WriteTimeOut"`
 	} `json:"Limits"`
 
 	Auth struct {

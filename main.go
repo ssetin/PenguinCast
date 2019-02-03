@@ -3,17 +3,18 @@ package main
 import (
 	"log"
 
-	"github.com/ssetin/PenguinCast/src/server"
+	iceserver "github.com/ssetin/PenguinCast/src/server"
 )
 
 func main() {
 	var IcySrv iceserver.IceServer
 
 	err := IcySrv.Init()
-	defer IcySrv.Close()
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
+	defer IcySrv.Close()
+
 	IcySrv.Start()
 }

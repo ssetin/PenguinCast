@@ -18,6 +18,10 @@ func (p *PoolManager) Init(size int) *sync.Pool {
 		p.pages = make(map[int]*sync.Pool)
 	}
 
+	if pool, ok := p.pages[size]; ok {
+		return pool
+	}
+
 	p.pages[size] = &sync.Pool{
 		New: func() interface{} {
 			return make([]byte, size)

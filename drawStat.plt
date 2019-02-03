@@ -32,7 +32,8 @@ set autoscale y
 
 
 plot "log/stat.log" using 1:2 title "Listeners" with lines linestyle 1 axes x1y1, \
-    "log/stat.log" using 1:(($4/totalMemory)*100) title "Memory" with lines linestyle 2 axes x1y2 , \
-    "log/stat.log" using 1:3 title "CPU" with lines linestyle 3 axes x1y2
+    "log/stat.log" using 1:3 title "CPU" with line linestyle 3 axes x1y2, \
+    "log/stat.log" using 1:(($4/totalMemory)*100) title "Memory" with line linestyle 2 axes x1y2
+   
     
 

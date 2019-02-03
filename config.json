@@ -4,7 +4,7 @@
     "Location": "Saint Petersburg",
     "Host": "192.168.10.2",
     "Socket": { "Port": 8008},
-    "Limits": {"Clients": 100000, "Sources": 5, "SourceIdleTimeOut": 10, "EmptyBufferIdleTimeOut": 5},
+    "Limits": {"Clients": 100000, "Sources": 5, "SourceIdleTimeOut": 10, "EmptyBufferIdleTimeOut": 5, "WriteTimeOut": 10},
     "Auth": {"AdminPassword": "admin"},
     "Paths": {"Log": "log/", "Web":"html/"},
     "Logging": {"Loglevel": 2, "Logsize": 50000, "UseMonitor": true, "UseStat": true},

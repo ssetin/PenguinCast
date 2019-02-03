@@ -19,7 +19,7 @@ import (
 
 const (
 	cServerName = "PenguinCast"
-	cVersion    = "0.2.0dev"
+	cVersion    = "0.2.0"
 )
 
 var (

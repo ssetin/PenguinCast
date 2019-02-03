@@ -10,7 +10,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // ================================== PenguinClient ========================================
@@ -91,8 +90,8 @@ func (p *PenguinClient) getMountInfo(reader *bufio.Reader) error {
 // Listen - start to listen the stream during secToListen seconds
 func (p *PenguinClient) Listen(secToListen int) error {
 	var err error
-	var beginIteration time.Time
-	var iterTime time.Duration
+	//var beginIteration time.Time
+	//var iterTime time.Duration
 	p.conn, err = net.Dial("tcp", p.host)
 
 	if err != nil {
@@ -127,7 +126,7 @@ func (p *PenguinClient) Listen(secToListen int) error {
 	sndBuff := make([]byte, 1024*p.bitRate/8)
 
 	for readedBytes <= bytesToFinish {
-		beginIteration = time.Now()
+		//beginIteration = time.Now()
 		n, err := p.conn.Read(sndBuff)
 		if err != nil {
 			return err
@@ -138,11 +137,11 @@ func (p *PenguinClient) Listen(secToListen int) error {
 		}
 		readedBytes += n
 
-		iterTime = time.Since(beginIteration)
+		//iterTime = time.Since(beginIteration)
 
-		if iterTime > time.Millisecond*4000 {
-			log.Printf("iter=%f sec", iterTime.Seconds())
-		}
+		//if iterTime > time.Millisecond*2000 {
+		//	log.Printf("Speed: %f Kbit/sec", float64(n)*8/1024/iterTime.Seconds())
+		//}
 	}
 
 	return nil

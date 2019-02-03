@@ -85,7 +85,7 @@ func (q *BufferQueue) Init(minsize int, pool *sync.Pool) {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	q.size = 0
-	q.maxBufferSize = minsize * 3
+	q.maxBufferSize = minsize * 8
 	q.minBufferSize = minsize
 	q.first = nil
 	q.last = nil
