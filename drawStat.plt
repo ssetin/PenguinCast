@@ -15,8 +15,8 @@ set timefmt "%Y-%m-%d %H:%M:%S"
 set format x "%d.%m.%Y\n%H:%M"
 
 set style line 1 lw 2 lt 1 lc 3
-set style line 2 lw 2 lt 1 lc 1
-set style line 3 lw 2 lt 1 lc 2
+set style line 2 lw 1 lt 1 lc 1
+set style line 3 lw 1 lt 1 lc 2
 
 # Memory
 set ylabel "Listeners"

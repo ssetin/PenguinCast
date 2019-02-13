@@ -6,4 +6,5 @@ main
 *.test
 *.pdf
 *.svg
+*DS_Store
 ue_*

@@ -19,7 +19,7 @@ import (
 
 const (
 	cServerName = "PenguinCast"
-	cVersion    = "0.2.0"
+	cVersion    = "0.9.0dev"
 )
 
 var (
@@ -43,6 +43,10 @@ type IceServer struct {
 	// for monitor
 	cpuUsage float64
 	memUsage int
+
+	// p2p relay's stuff
+	relayPoints  map[string]int
+	listenPoints map[string]int
 
 	srv           *http.Server
 	poolManager   PoolManager
@@ -87,6 +91,9 @@ func (i *IceServer) Init() error {
 		i.statReader.Init()
 		go i.processStats()
 	}
+
+	i.relayPoints = make(map[string]int)
+	i.listenPoints = make(map[string]int)
 
 	return nil
 }
@@ -178,6 +185,61 @@ func (i *IceServer) checkIsCommand(page string, r *http.Request) int {
 	return -1
 }
 
+func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
+	var peer Peer
+	var isRelayPoint bool
+
+	peer.addr = r.Header.Get("MyAddr")
+	if r.Header.Get("Flag") == "relay" {
+		isRelayPoint = true
+	}
+
+	if isRelayPoint {
+		log.Println("New relay point: " + peer.addr)
+		i.relayPoints[peer.addr] = 0
+	} else {
+		log.Println("New listen point: " + peer.addr)
+		i.listenPoints[peer.addr] = 0
+	}
+
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		i.printError(1, "webserver doesn't support hijacking")
+		http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
+		return
+	}
+
+	conn, bufrw, err := hj.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer conn.Close()
+
+	bufrw.WriteString("HTTP/1.0 200 OK\r\n")
+	bufrw.WriteString("Server: ")
+	bufrw.WriteString(i.serverName)
+	bufrw.WriteString(" ")
+	bufrw.WriteString(i.version)
+	if !isRelayPoint && len(i.relayPoints) >= 1 {
+		for a, count := range i.relayPoints {
+			if count == 0 {
+				bufrw.WriteString("\r\nAddress: ")
+				bufrw.WriteString(a)
+			}
+		}
+	} else if len(i.listenPoints) >= 1 {
+		for a, count := range i.listenPoints {
+			if count == 0 {
+				bufrw.WriteString("\r\nAddress: ")
+				bufrw.WriteString(a)
+			}
+		}
+	}
+	bufrw.WriteString("\r\n")
+	bufrw.Flush()
+}
+
 func (i *IceServer) handler(w http.ResponseWriter, r *http.Request) {
 	if i.Props.Logging.Loglevel == 4 {
 		i.logHeaders(w, r)
@@ -249,6 +311,7 @@ func (i *IceServer) Start() {
 
 	//streamedHandler := i.wrapHandlerWithStreaming(http.HandlerFunc(i.handler))
 	//http.Handle("/", streamedHandler)
+	http.HandleFunc("/Pi", i.piHandler)
 	http.HandleFunc("/", i.handler)
 
 	go func() {
