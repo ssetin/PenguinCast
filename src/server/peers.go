@@ -24,10 +24,10 @@ type peer struct {
 
 type peersCollection []*peer
 
-// Swap elements in collection, update their indexes
+// Swap elements in collection, recover their indexes
 func (c peersCollection) Swap(i, j int) {
 	c[i], c[j] = c[j], c[i]
-	c[i].idx, c[j].idx = j, i
+	c[i].idx, c[j].idx = i, j
 }
 
 func (c peersCollection) Less(i, j int) bool {
@@ -102,7 +102,7 @@ func (p *PeersManager) UpdateRelayPoint(addr string, stat, latc int) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
 	if peer, ok := p.peers[addr]; ok {
-		if stat == 3 || latc == -1 {
+		if stat == 2 || latc == -1 {
 			p.deletePeer(peer)
 		} else {
 			peer.latency = latc

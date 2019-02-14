@@ -6,8 +6,9 @@ import (
 )
 
 type SortingCR struct {
-	Case     map[string]int
-	Response []string
+	NewRelays    map[string]int
+	DeleteRelays []string
+	Response     []string
 }
 
 func TestManagingPeers(t *testing.T) {
@@ -16,33 +17,44 @@ func TestManagingPeers(t *testing.T) {
 	manager.Init()
 
 	cases := []SortingCR{SortingCR{
-		Case: map[string]int{
-			"192.168.45.10:99919": -1, // remove peer
+		NewRelays: map[string]int{
 			"192.168.45.13:19919": 110,
-			"192.168.45.11:29919": 90,
 			"192.168.45.16:39919": 140,
 			"192.168.45.10:49919": 7,
+			"192.168.45.10:99919": 99,
 			"192.168.45.10:59919": 130,
 			"192.168.45.19:69919": 110,
-			"192.168.45.66:79919": 12,
+			"192.168.45.11:29919": 90,
 			"192.168.45.33:89919": 110,
+			"192.168.45.66:79919": 12,
 			"192.168.45.98:99910": 100},
-		Response: []string{"192.168.45.10:49919", "192.168.45.66:79919", "192.168.45.11:29919"},
+		DeleteRelays: []string{"192.168.45.11:29919", "192.168.45.10:99919"},
+		Response:     []string{"192.168.45.10:49919", "192.168.45.66:79919", "192.168.45.98:99910"},
 	},
 	}
 
-	// existing peer
+	// add existing peer
 	manager.AddNewRelayPoint("192.168.45.19:69919")
 
 	for _, cs := range cases {
-		for item := range cs.Case {
+		for item := range cs.NewRelays {
 			manager.AddNewRelayPoint(item)
 		}
-		for item, lat := range cs.Case {
+		for item, lat := range cs.NewRelays {
 			manager.UpdateRelayPoint(item, 0, lat)
 		}
 
+		// sort and get top3
 		top3 := manager.GetTop3RelayPoints()
+
+		// remove after sort
+		for _, del := range cs.DeleteRelays {
+			manager.UpdateRelayPoint(del, 2, -1)
+		}
+
+		// sort again
+		top3 = manager.GetTop3RelayPoints()
+
 		if !reflect.DeepEqual(cs.Response, top3) {
 			t.Errorf("Expected: [%v],\ngot [%v]\n", cs.Response, top3)
 			continue
