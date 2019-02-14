@@ -186,7 +186,7 @@ func (i *IceServer) checkIsCommand(page string, r *http.Request) int {
 }
 
 func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
-	var peer Peer
+	var peer peer
 	var isRelayPoint bool
 
 	peer.addr = r.Header.Get("MyAddr")
