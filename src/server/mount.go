@@ -58,6 +58,9 @@ type Mount struct {
 		Listeners   int32
 	} `json:"-"`
 
+	// p2p relays stuff
+	peersManager PeersManager
+
 	mux      sync.Mutex
 	Server   *IceServer `json:"-"`
 	buffer   BufferQueue
@@ -70,9 +73,6 @@ func (m *Mount) Init(srv *IceServer) error {
 	m.Clear()
 	m.State.MetaInfo.MetaInt = m.BitRate * 1024 / 8 * 10
 
-	pool := m.Server.poolManager.Init(m.BitRate * 1024 / 8)
-	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8)+2, pool)
-
 	if m.DumpFile > "" {
 		var err error
 		m.dumpFile, err = os.OpenFile(srv.Props.Paths.Log+m.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
@@ -80,6 +80,10 @@ func (m *Mount) Init(srv *IceServer) error {
 			return err
 		}
 	}
+
+	pool := m.Server.poolManager.Init(m.BitRate * 1024 / 8)
+	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8)+2, pool)
+	m.peersManager.Init()
 
 	return nil
 }

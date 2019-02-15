@@ -162,6 +162,7 @@ func (p *PenguinClient) SendMyAddr(ip, port string) error {
 	writer := bufio.NewWriter(conn)
 
 	writer.WriteString("GET /Pi HTTP/1.0\r\n")
+	writer.WriteString("Mount: " + p.mount + "\r\n")
 	writer.WriteString("MyAddr: " + ip + ":" + port + "\r\n")
 	if p.iCan {
 		writer.WriteString("Flag: relay\r\n")

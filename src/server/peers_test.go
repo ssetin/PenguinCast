@@ -45,7 +45,7 @@ func TestManagingPeers(t *testing.T) {
 		}
 
 		// sort and get top3
-		top3 := manager.GetTop3RelayPoints()
+		top3 := manager.GetTop3RelayPoints("")
 
 		// remove after sort
 		for _, del := range cs.DeleteRelays {
@@ -53,7 +53,7 @@ func TestManagingPeers(t *testing.T) {
 		}
 
 		// sort again
-		top3 = manager.GetTop3RelayPoints()
+		top3 = manager.GetTop3RelayPoints("")
 
 		if !reflect.DeepEqual(cs.Response, top3) {
 			t.Errorf("Expected: [%v],\ngot [%v]\n", cs.Response, top3)

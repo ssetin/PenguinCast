@@ -44,10 +44,6 @@ type IceServer struct {
 	cpuUsage float64
 	memUsage int
 
-	// p2p relay's stuff
-	relayPoints  map[string]int
-	listenPoints map[string]int
-
 	srv           *http.Server
 	poolManager   PoolManager
 	logError      *log.Logger
@@ -91,9 +87,6 @@ func (i *IceServer) Init() error {
 		i.statReader.Init()
 		go i.processStats()
 	}
-
-	i.relayPoints = make(map[string]int)
-	i.listenPoints = make(map[string]int)
 
 	return nil
 }
@@ -176,6 +169,15 @@ func (i *IceServer) checkIsMount(page string) int {
 	return -1
 }
 
+func (i *IceServer) getMount(mountName string) *Mount {
+	for idx := range i.Props.Mounts {
+		if i.Props.Mounts[idx].Name == mountName {
+			return &i.Props.Mounts[idx]
+		}
+	}
+	return nil
+}
+
 func (i *IceServer) checkIsCommand(page string, r *http.Request) int {
 	for idx := range vCommands {
 		if vCommands[idx] == page && r.URL.Query().Get("mode") == "updinfo" {
@@ -185,21 +187,41 @@ func (i *IceServer) checkIsCommand(page string, r *http.Request) int {
 	return -1
 }
 
+// piHandler handler to manage p2p connections
 func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
-	var peer peer
 	var isRelayPoint bool
 
-	peer.addr = r.Header.Get("MyAddr")
+	addr := r.Header.Get("MyAddr")
+	connectedAddr := r.Header.Get("Connected")
 	if r.Header.Get("Flag") == "relay" {
 		isRelayPoint = true
 	}
 
+	mountName := r.Header.Get("Mount")
+	mount := i.getMount(mountName)
+
+	if mount == nil || addr == "" {
+		return
+	}
+
+	// two peers have agreed about the connection
+	if len(connectedAddr) > 0 {
+		pair := strings.Split(connectedAddr, ", ")
+		if len(pair) == 2 {
+			mount.peersManager.PeersConnected(strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1]))
+		} else {
+			return
+		}
+	}
+
 	if isRelayPoint {
-		log.Println("New relay point: " + peer.addr)
-		i.relayPoints[peer.addr] = 0
+		if mount.peersManager.AddNewRelayPoint(addr) {
+			log.Println("New relay point: " + addr)
+		}
 	} else {
-		log.Println("New listen point: " + peer.addr)
-		i.listenPoints[peer.addr] = 0
+		if mount.peersManager.AddNewListenPoint(addr) {
+			log.Println("New listen point: " + addr)
+		}
 	}
 
 	hj, ok := w.(http.Hijacker)
@@ -221,25 +243,26 @@ func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
 	bufrw.WriteString(i.serverName)
 	bufrw.WriteString(" ")
 	bufrw.WriteString(i.version)
-	if !isRelayPoint && len(i.relayPoints) >= 1 {
-		for a, count := range i.relayPoints {
-			if count == 0 {
-				bufrw.WriteString("\r\nAddress: ")
-				bufrw.WriteString(a)
-			}
+	if !isRelayPoint {
+		// tell listener who could be its relay point
+		top3 := mount.peersManager.GetTop3RelayPoints(addr)
+		if len(top3) > 0 {
+			bufrw.WriteString("\r\nAddress: ")
+			bufrw.WriteString(strings.Join(top3, ","))
 		}
-	} else if len(i.listenPoints) >= 1 {
-		for a, count := range i.listenPoints {
-			if count == 0 {
-				bufrw.WriteString("\r\nAddress: ")
-				bufrw.WriteString(a)
-			}
+	} else {
+		// tell relay point who could be its listener
+		peer := mount.peersManager.GetPeer(addr)
+		if peer != nil {
+			bufrw.WriteString("\r\nAddress: ")
+			bufrw.WriteString(strings.Join(peer.GetCandidates(), ","))
 		}
 	}
 	bufrw.WriteString("\r\n")
 	bufrw.Flush()
 }
 
+// handler general http handler
 func (i *IceServer) handler(w http.ResponseWriter, r *http.Request) {
 	if i.Props.Logging.Loglevel == 4 {
 		i.logHeaders(w, r)
