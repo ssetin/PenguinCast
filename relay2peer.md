@@ -37,6 +37,7 @@ MyAddr: [IP:PORT]
 
 ### PenguinCast
 6. Send answer to Listener with OK message and list possible relays addresses if they are exists
+
 ```http
 HTTP/1.0 200 OK
 Server: [Name]/[Version]
@@ -46,6 +47,7 @@ Address: [IP:PORT, IP:PORT, IP:PORT]
 ### Relay and Listener points
 7. After getting candidates addresses each client should try to connect each other using UDP
 8. After connection established each client should inform PenguinCast about that
+
 ```http
 GET /Pi HTTP/1.0
 Connected: [IP:PORT, IP:PORT]
