@@ -16,7 +16,8 @@ type Peer struct {
 	// 0 - ready
 	// 1 - busy
 	// 2 - disconnected
-	status  int
+	status int
+	// latency in reading data from the server for that peer
 	latency int
 	// true if this peer is a relay point
 	relay bool
@@ -106,7 +107,7 @@ func (c peersCollection) Len() int {
 
 // ========================= PeersManager ================================
 
-// PeersManager ...
+// PeersManager type for managing relays and listeners points
 type PeersManager struct {
 	mux sync.Mutex
 	// peers, who want to be a p2p relay point
@@ -124,21 +125,22 @@ func (p *PeersManager) Init() {
 	p.peers = make(map[string]*Peer)
 }
 
-// AddNewRelayPoint add new peer to relays collection
-func (p *PeersManager) AddNewRelayPoint(addr string) bool {
+// AddOrUpdateRelayPoint add new peer to relays collection or update it's latency
+func (p *PeersManager) AddOrUpdateRelayPoint(addr string, latency int) bool {
 	p.mux.Lock()
 	defer p.mux.Unlock()
-	if _, ok := p.peers[addr]; ok {
+	if peer, ok := p.peers[addr]; ok {
+		peer.SetLatency(latency)
 		return false
 	}
-	rp := &Peer{addr: addr, relay: true, idx: len(p.relayPeers)}
+	rp := &Peer{addr: addr, relay: true, idx: len(p.relayPeers), latency: latency}
 	p.relayPeers = append(p.relayPeers, rp)
 	p.peers[addr] = rp
 	return true
 }
 
-// AddNewListenPoint add new peer to listener collection
-func (p *PeersManager) AddNewListenPoint(addr string) bool {
+// AddListenPoint add new peer to listener collection
+func (p *PeersManager) AddListenPoint(addr string) bool {
 	p.mux.Lock()
 	defer p.mux.Unlock()
 	if _, ok := p.peers[addr]; ok {

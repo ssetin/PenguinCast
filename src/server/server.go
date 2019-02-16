@@ -215,11 +215,12 @@ func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if isRelayPoint {
-		if mount.peersManager.AddNewRelayPoint(addr) {
+		latency, _ := strconv.Atoi(r.Header.Get("Latency"))
+		if mount.peersManager.AddOrUpdateRelayPoint(addr, latency) {
 			log.Println("New relay point: " + addr)
 		}
 	} else {
-		if mount.peersManager.AddNewListenPoint(addr) {
+		if mount.peersManager.AddListenPoint(addr) {
 			log.Println("New listen point: " + addr)
 		}
 	}

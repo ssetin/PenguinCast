@@ -12,6 +12,7 @@ The following HTTP requests are about it:
 GET /Pi HTTP/1.0
 Mount: [MountName]
 MyAddr: [IP:PORT]
+Latency: [latency, ms]
 Flag: relay
 ```
 
@@ -21,7 +22,7 @@ Flag: relay
 ```http
 HTTP/1.0 200 OK
 Server: [Name]/[Version]
-Address: [IP:PORT, IP:PORT, IP:PORT]
+Address: [IP:PORT:IP:PORT:IP:PORT]
 ```
 
 ### Listener point
@@ -41,7 +42,7 @@ MyAddr: [IP:PORT]
 ```http
 HTTP/1.0 200 OK
 Server: [Name]/[Version]
-Address: [IP:PORT, IP:PORT, IP:PORT]
+Address: [IP:PORT:IP:PORT:IP:PORT]
 ```
 
 ### Relay and Listener points
