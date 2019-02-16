@@ -34,11 +34,11 @@ func TestManagingPeers(t *testing.T) {
 	}
 
 	// add existing peer
-	manager.AddNewRelayPoint("192.168.45.19:69919")
+	manager.AddOrUpdateRelayPoint("192.168.45.19:69919", 0)
 
 	for _, cs := range cases {
 		for item := range cs.NewRelays {
-			manager.AddNewRelayPoint(item)
+			manager.AddOrUpdateRelayPoint(item, 0)
 		}
 		for item, lat := range cs.NewRelays {
 			manager.UpdateRelayPoint(item, 0, lat)
