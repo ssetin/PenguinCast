@@ -8,8 +8,9 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"sync/atomic"
 	"time"
+
+	relay2peer "github.com/ssetin/PenguinCast/src/relay2peer"
 )
 
 // ================================== PenguinClient ========================================
@@ -27,9 +28,7 @@ type PenguinClient struct {
 	bitRate      int
 
 	// responsible for establishing p2p connections
-	peerConnector PeerConnector
-	//
-	Started int32
+	peerConnector relay2peer.PeerConnector
 	// means that client want to use a relay point
 	iWant bool
 	// means that client could be a relay point
@@ -47,7 +46,7 @@ func (p *PenguinClient) Init(host string, mount string, dump string) error {
 	p.dumpFileName = dump
 	p.iWant = false
 	p.iCan = false
-	p.Started = 0
+	p.peerConnector.Init(mount, host, "")
 
 	if dump > "" {
 		var err error
@@ -82,10 +81,12 @@ func (p *PenguinClient) sayHello(writer *bufio.Writer) error {
 	return nil
 }
 
-// Listen - start to listen the stream during secToListen seconds
+// Listen - start to listen the stream during secToListen seconds.
+// Actually reads bytes according to that duration
 func (p *PenguinClient) Listen(secToListen int) error {
 	var err error
 	var streamConnection net.Conn
+	ok := false
 
 	p.conn, err = net.Dial("tcp", p.host)
 	if err != nil {
@@ -118,11 +119,19 @@ func (p *PenguinClient) Listen(secToListen int) error {
 		return errors.New("Unknown bitrate")
 	}
 
+	// prepare peerConnector to work
+	if p.iCan || p.iWant {
+		log.Println("prepare peerConnector")
+		p.peerConnector.SetIsRelayPoint(p.iCan)
+	}
+
 	// if listener find relay point during searchingTimeOut he will use that udp peer connection
 	// else he will use direct tcp connection to server
 	if p.iWant {
-		streamConnection = <-p.peerConnector.Relay2Peer()
-		if streamConnection != nil {
+		r2pChan := p.peerConnector.GetConnection()
+		streamConnection, ok = <-r2pChan
+		if ok {
+			log.Println("Found Relay")
 			p.conn.Close()
 		} else {
 			streamConnection = p.conn
@@ -131,50 +140,66 @@ func (p *PenguinClient) Listen(secToListen int) error {
 		streamConnection = p.conn
 	}
 
-	err = p.readStream(streamConnection, secToListen)
-	if err != nil {
-		return err
-	}
-
-	streamConnection.Close()
-
-	return nil
+	defer streamConnection.Close()
+	return p.readStream(streamConnection, secToListen)
 }
 
-// readStream ...
-func (p *PenguinClient) readStream(conn net.Conn, secToListen int) error {
+// readStream read stream from appropriated connection
+func (p *PenguinClient) readStream(streamConnection net.Conn, secToListen int) error {
+	if streamConnection == nil {
+		return errors.New("no connection")
+	}
+
 	var beginIteration time.Time
-	var r2pConnection net.Conn
+	var r2pConnection *relay2peer.PeerConnection
+	var r2pChan chan *relay2peer.PeerConnection
+
 	bytesToFinish := secToListen * p.bitRate * 1024 / 8
 	readedBytes := 0
+
+	// if streamConnection is relay point, data begins from 8th byte
+	startDataIdx := 0
+	if _, isPeerConnection := streamConnection.(*relay2peer.PeerConnection); isPeerConnection {
+		startDataIdx = 8
+	}
+
+	ok := false
 	sndBuff := make([]byte, 1024*p.bitRate/8)
+
+	if p.iCan {
+		r2pChan = p.peerConnector.GetConnection()
+	}
 
 	for readedBytes <= bytesToFinish {
 		beginIteration = time.Now()
-		n, err := conn.Read(sndBuff)
+		n, err := streamConnection.Read(sndBuff)
 		if err != nil {
-			atomic.StoreInt32(&p.Started, 0)
 			return err
 		}
 
-		// update latency and try to find listener point
+		// For Relay Point. update latency and try to find listener point
 		if p.iCan {
-			p.peerConnector.UpdateLatency(int32(time.Since(beginIteration)))
+			p.peerConnector.UpdateLatency(int64(time.Since(beginIteration)))
 
 			if r2pConnection == nil {
 				select {
-				case r2pConnection = <-p.peerConnector.Relay2Peer():
+				case r2pConnection, ok = <-r2pChan:
+					if ok {
+						log.Println("Found Listener ")
+					} else {
+						r2pConnection = nil
+					}
 				default:
 				}
 			}
 
 			if r2pConnection != nil {
-				p.writeStream(r2pConnection, sndBuff, n)
+				p.writeStream(r2pConnection, sndBuff[:n])
 			}
 		}
 
 		if p.dumpFile != nil && n > 0 {
-			p.dumpFile.Write(sndBuff[:n])
+			p.dumpFile.Write(sndBuff[startDataIdx:n])
 		}
 		readedBytes += n
 	}
@@ -182,7 +207,7 @@ func (p *PenguinClient) readStream(conn net.Conn, secToListen int) error {
 	return nil
 }
 
-// writeStream ...
-func (p *PenguinClient) writeStream(conn net.Conn, buf []byte, n int) {
-	conn.Write(buf[:n])
+// writeStream relay data to listener point
+func (p *PenguinClient) writeStream(conn *relay2peer.PeerConnection, buf []byte) (int, error) {
+	return conn.Write(buf)
 }

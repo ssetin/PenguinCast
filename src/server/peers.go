@@ -2,6 +2,7 @@
 package iceserver
 
 import (
+	"log"
 	"sort"
 	"sync"
 )
@@ -191,6 +192,8 @@ func (p *PeersManager) UpdateRelayPoint(addr string, stat, latc int) {
 func (p *PeersManager) PeersConnected(addr, addr2 string) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
+	log.Println("PeersConnected " + addr + " <-> " + addr2)
+
 	if peer, ok := p.peers[addr]; ok {
 		peer.SetStatus(1)
 	}

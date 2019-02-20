@@ -217,7 +217,7 @@ func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
 	if isRelayPoint {
 		latency, _ := strconv.Atoi(r.Header.Get("Latency"))
 		if mount.peersManager.AddOrUpdateRelayPoint(addr, latency) {
-			log.Println("New relay point: " + addr)
+			log.Println("New relay point: " + addr + " [" + r.Header.Get("Latency") + " ms]")
 		}
 	} else {
 		if mount.peersManager.AddListenPoint(addr) {
@@ -259,7 +259,7 @@ func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
 			bufrw.WriteString(strings.Join(peer.GetCandidates(), ","))
 		}
 	}
-	bufrw.WriteString("\r\n")
+	bufrw.WriteString("\r\n\r\n")
 	bufrw.Flush()
 }
 

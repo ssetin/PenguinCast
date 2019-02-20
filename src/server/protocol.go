@@ -80,7 +80,7 @@ func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 
 func (i *IceServer) closeAndUnlock(pack *BufElement, err error) {
 	if te, ok := err.(net.Error); ok && te.Timeout() {
-		log.Println("Write timeout")
+		log.Println("Write timeout " + te.Error())
 		i.printError(1, "Write timeout")
 	} else {
 		i.printError(1, err.Error())
