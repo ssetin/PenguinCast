@@ -63,31 +63,36 @@ After relay and listener know addresses of each other they have to send few hand
 
 ### Relay point
 9. Send message to listener point
-```udp
+
+```http
 helloListener
 ```
 
 ### Listener point
 10. Send message to relay point
-```udp
+
+```http
 helloRelay
 ```
 
 ### Relay point
 11. After getting hello message send answer
-```udp
+
+```http
 niceToMeetYouListener
 ```
 
 ### Listener point
 12. After getting hello message send answer
-```udp
+
+```http
 niceToMeetYouRelay
 ```
 
 ### Relay point
 13. After sending answer, pack stream data to UDPMessage struct and start transmitting
-```udp
+
+```http
 UDPMessage
 ```
 
@@ -99,6 +104,7 @@ UDPMessage consist of data begins from 8th byte, checksum and header marks at 00
 
 ### Listener point
 14. After sending answer, wait for UDPMessage with stream and start receiving data
-```udp
+
+```http
 UDPMessage
 ```
