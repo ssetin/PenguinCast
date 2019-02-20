@@ -91,15 +91,11 @@ niceToMeetYouRelay
 UDPMessage
 ```
 
-UDPMessage:  
+UDPMessage consist of data begins from 8th byte, checksum and header marks at 00,01 and 06,07th bytes:  
 
         byte | 00 | 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08
         ---- | -- | -- | -- | -- | -- | -- | -- | -- | --
          val | 45 | 61 |    CRC32(data)    | 61 | 45 | data ...
-
-| Column 1 | Column 2 | Column 3 |
-| -------- | -------- | -------- |
-| Text     | Text     | Text     |
 
 ### Listener point
 14. After sending answer, wait for UDPMessage with stream and start receiving data
