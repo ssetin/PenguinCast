@@ -189,16 +189,20 @@ func (i *IceServer) checkIsCommand(page string, r *http.Request) int {
 
 // piHandler handler to manage p2p connections
 func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
-	var isRelayPoint bool
+	if i.Props.Logging.Loglevel == 4 {
+		i.logHeaders(w, r)
+	}
 
+	isRelayPoint := false
 	addr := r.Header.Get("MyAddr")
 	connectedAddr := r.Header.Get("Connected")
+	check := r.Header.Get("Check")
+	mountName := r.Header.Get("Mount")
+	mount := i.getMount(mountName)
+
 	if r.Header.Get("Flag") == "relay" {
 		isRelayPoint = true
 	}
-
-	mountName := r.Header.Get("Mount")
-	mount := i.getMount(mountName)
 
 	if mount == nil {
 		i.printError(1, "piHandler, no Mount specified")
@@ -228,6 +232,11 @@ func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		if mount.peersManager.AddListenPoint(addr) {
 			log.Println("New listen point: " + addr)
+		} else {
+			// TODO: process recieved checksums
+			if len(check) > 0 {
+				mount.peersManager.GetPeer(addr).Update()
+			}
 		}
 	}
 
@@ -251,11 +260,16 @@ func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
 	bufrw.WriteString(" ")
 	bufrw.WriteString(i.version)
 	if !isRelayPoint {
-		// tell listener who could be its relay point
-		top3 := mount.peersManager.GetTop3RelayPoints(addr)
-		if len(top3) > 0 {
-			bufrw.WriteString("\r\nAddress: ")
-			bufrw.WriteString(strings.Join(top3, ","))
+		if len(check) > 0 {
+			// TODO: tell about check results
+			bufrw.WriteString("\r\nCheck: OK")
+		} else {
+			// tell listener who could be its relay point
+			top3 := mount.peersManager.GetTop3RelayPoints(addr)
+			if len(top3) > 0 {
+				bufrw.WriteString("\r\nAddress: ")
+				bufrw.WriteString(strings.Join(top3, ","))
+			}
 		}
 	} else {
 		// tell relay point who could be its listener

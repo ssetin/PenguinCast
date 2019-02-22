@@ -156,6 +156,7 @@ func (p *PenguinClient) readStream(streamConnection net.Conn, secToListen int) e
 
 	bytesToFinish := secToListen * p.bitRate * 1024 / 8
 	readedBytes := 0
+	packSize := 0
 
 	// if streamConnection is relay point, data begins from 7th byte
 	startDataIdx := 0
@@ -175,6 +176,13 @@ func (p *PenguinClient) readStream(streamConnection net.Conn, secToListen int) e
 		n, err := streamConnection.Read(sndBuff)
 		if err != nil {
 			return err
+		}
+
+		// TODO: collect fragments, calc their checksums and send report to server
+		// to check stream and keep alive status
+		if startDataIdx == 7 && packSize > 2*1024*p.bitRate/8 {
+			p.peerConnector.ReportToServer(2)
+			packSize = 0
 		}
 
 		// For Relay Point. update latency and try to find listener point
@@ -202,6 +210,7 @@ func (p *PenguinClient) readStream(streamConnection net.Conn, secToListen int) e
 			p.dumpFile.Write(sndBuff[startDataIdx:n])
 		}
 		readedBytes += n
+		packSize += n
 	}
 
 	return nil

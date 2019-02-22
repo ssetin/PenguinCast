@@ -24,6 +24,7 @@ import (
 // TODO:
 // - peer should compare checksum of the received packets with server to ensure that packets are original
 // - process statistics about p2p connections
+// - show peers on stat page
 
 // MetaData ...
 type MetaData struct {

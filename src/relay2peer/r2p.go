@@ -27,7 +27,7 @@ const (
 	searchingTimeOut    = 10000
 	udpPackSize         = 512
 
-	// when call reportToServer pass that states to determine report kind
+	// when call ReportToServer pass that states to determine report kind
 	stateGeneral   = 0
 	stateConnected = 1
 	stateCheck     = 2
@@ -236,8 +236,8 @@ func (p *PeerConnector) SetIsRelayPoint(isRelayPoint bool) {
 	p.isRelayPoint = isRelayPoint
 }
 
-// reportToServer tells managing server information about peer
-func (p *PeerConnector) reportToServer(state int) error {
+// ReportToServer tells managing server information about peer
+func (p *PeerConnector) ReportToServer(state int) error {
 	manConn, err := net.Dial("tcp", p.srvHost)
 	if err != nil {
 		return err
@@ -247,21 +247,30 @@ func (p *PeerConnector) reportToServer(state int) error {
 
 	writer.WriteString("GET /Pi HTTP/1.0\r\n")
 	writer.WriteString("Mount: " + p.mountName + "\r\n")
-
-	if state == stateConnected && p.peerAddr != nil {
-		writer.WriteString("Connected: " + p.publicAddr.IP.String() + ":" + strconv.Itoa(p.publicAddr.Port) + ",")
-		writer.WriteString(p.peerAddr.String() + "\r\n\r\n")
-		writer.Flush()
-		return nil
-	}
-
 	writer.WriteString("MyAddr: " + p.publicAddr.IP.String() + ":" + strconv.Itoa(p.publicAddr.Port) + "\r\n")
-	if p.isRelayPoint {
-		writer.WriteString("Latency: ")
-		lat := int(atomic.LoadInt64(&p.latency))
-		writer.WriteString(strconv.Itoa(lat))
-		writer.WriteString("\r\nFlag: relay\r\n")
+
+	switch state {
+	case stateConnected:
+		if p.peerAddr != nil {
+			writer.WriteString("Connected: " + p.publicAddr.IP.String() + ":" + strconv.Itoa(p.publicAddr.Port) + ",")
+			writer.WriteString(p.peerAddr.String() + "\r\n")
+		}
+
+	case stateCheck:
+		// TODO: organize and calculate checksums
+		if !p.isRelayPoint {
+			writer.WriteString("Check: TEST\r\n")
+		}
+
+	case stateGeneral:
+		if p.isRelayPoint {
+			writer.WriteString("Latency: ")
+			lat := int(atomic.LoadInt64(&p.latency))
+			writer.WriteString(strconv.Itoa(lat))
+			writer.WriteString("\r\nFlag: relay\r\n")
+		}
 	}
+
 	writer.WriteString("\r\n")
 	writer.Flush()
 
@@ -297,7 +306,7 @@ func (p *PeerConnector) computeMyIP(msg []byte) error {
 	if p.publicAddr.String() != xorAddr.String() {
 		p.publicAddr = xorAddr
 	}
-	p.reportToServer(stateGeneral)
+	p.ReportToServer(stateGeneral)
 	return nil
 }
 
@@ -369,7 +378,7 @@ func (p *PeerConnector) GetConnection() chan *PeerConnection {
 				// done. pass control to the stream reader
 				keepAliveTicker.Stop()
 				timeoutTicker.Stop()
-				p.reportToServer(stateConnected)
+				p.ReportToServer(stateConnected)
 
 				doneChan <- struct{}{}
 				udpConnChan <- &PeerConnection{conn, p.peerAddr, false}

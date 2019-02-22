@@ -2,6 +2,7 @@
 package iceserver
 
 import (
+	"log"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -182,11 +183,12 @@ func (p *PeersManager) inspector() {
 		p.mux.Lock()
 		for adr, peer := range p.peers {
 			// if lastUpdateTime of this peer is more then 10 secs, let consider it closed
+			// temp. leave relay alone
 			if time.Since(peer.lastUpdateTime) > time.Second*peerLifeTimeUpdateTimeOut {
 				if !peer.relay && p.writeLog != nil {
 					p.writeLog(adr, peer.connectedTime, "GET /"+p.mountName+" UDP", 0, "-", "penguinClient", int(time.Since(peer.connectedTime).Seconds()))
+					p.deletePeer(peer)
 				}
-				p.deletePeer(peer)
 				continue
 			}
 		}
@@ -236,6 +238,7 @@ func (p *PeersManager) GetPeer(addr string) *Peer {
 
 // deletePeer delete peer from collections
 func (p *PeersManager) deletePeer(item *Peer) {
+	log.Printf("delete peer %s", item.addr)
 	if item.relay {
 		p.relayPeers[item.idx] = p.relayPeers[len(p.relayPeers)-1]
 		p.relayPeers = p.relayPeers[:len(p.relayPeers)-1]
