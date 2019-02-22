@@ -2,12 +2,17 @@
 package iceserver
 
 import (
-	"log"
 	"sort"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // ============================== peer ===================================
+
+const (
+	peerLifeTimeUpdateTimeOut = 15 // sec
+)
 
 // Peer ...
 type Peer struct {
@@ -15,7 +20,7 @@ type Peer struct {
 	// ip:port
 	addr string
 	// 0 - ready
-	// 1 - busy
+	// 1 - connected
 	// 2 - disconnected
 	status int
 	// latency in reading data from the server for that peer
@@ -27,6 +32,9 @@ type Peer struct {
 	// candidates to connect
 	// when this peer is relay point this field contains possible listeners
 	candidates []*Peer
+
+	connectedTime  time.Time
+	lastUpdateTime time.Time
 }
 
 // AddCandidate add listener who get this peer as possible relay point
@@ -50,7 +58,11 @@ func (p *Peer) ClearCandidates() {
 func (p *Peer) SetStatus(newstat int) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
+	if newstat == 1 {
+		p.connectedTime = time.Now()
+	}
 	p.status = newstat
+	p.lastUpdateTime = time.Now()
 }
 
 // SetLatency set latency
@@ -58,6 +70,14 @@ func (p *Peer) SetLatency(newlat int) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
 	p.latency = newlat
+	p.lastUpdateTime = time.Now()
+}
+
+// Update lastUpdateTime
+func (p *Peer) Update() {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+	p.lastUpdateTime = time.Now()
 }
 
 // SetStatusLatency set latency and status
@@ -66,6 +86,7 @@ func (p *Peer) SetStatusLatency(newstat, newlat int) {
 	defer p.mux.Unlock()
 	p.latency = newlat
 	p.status = newstat
+	p.lastUpdateTime = time.Now()
 }
 
 // GetCandidates get candidates addresses to connect
@@ -108,6 +129,8 @@ func (c peersCollection) Len() int {
 
 // ========================= PeersManager ================================
 
+type callbackWriteLog func(host string, startTime time.Time, request string, bytessended int, refer, userAgent string, seconds int)
+
 // PeersManager type for managing relays and listeners points
 type PeersManager struct {
 	mux sync.Mutex
@@ -117,13 +140,61 @@ type PeersManager struct {
 	listenPeers peersCollection
 	// links to peers by their ip
 	peers map[string]*Peer
+
+	// callback for writing log about peers
+	writeLog         callbackWriteLog
+	startedInspector int32
+	mountName        string
+	wg               sync.WaitGroup
 }
 
-// Init init collections
-func (p *PeersManager) Init() {
+// Init - init collections, set callback for writing log
+func (p *PeersManager) Init(cb callbackWriteLog, mountName string) {
 	p.relayPeers = make(peersCollection, 0, 10)
 	p.listenPeers = make(peersCollection, 0, 10)
 	p.peers = make(map[string]*Peer)
+	p.writeLog = cb
+	p.mountName = mountName
+	atomic.StoreInt32(&p.startedInspector, 1)
+	p.wg.Add(1)
+
+	// start inspector
+	go p.inspector()
+}
+
+// Close ...
+func (p *PeersManager) Close() {
+	atomic.StoreInt32(&p.startedInspector, 0)
+	p.wg.Wait()
+}
+
+// watching for peers status
+func (p *PeersManager) inspector() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	defer p.wg.Done()
+
+	for {
+		if atomic.LoadInt32(&p.startedInspector) == 0 {
+			break
+		}
+
+		p.mux.Lock()
+		for adr, peer := range p.peers {
+			// if lastUpdateTime of this peer is more then 10 secs, let consider it closed
+			if time.Since(peer.lastUpdateTime) > time.Second*peerLifeTimeUpdateTimeOut {
+				if !peer.relay && p.writeLog != nil {
+					p.writeLog(adr, peer.connectedTime, "GET /"+p.mountName+" UDP", 0, "-", "penguinClient", int(time.Since(peer.connectedTime).Seconds()))
+				}
+				p.deletePeer(peer)
+				continue
+			}
+		}
+		p.mux.Unlock()
+
+		<-ticker.C
+	}
+
 }
 
 // AddOrUpdateRelayPoint add new peer to relays collection or update it's latency
@@ -134,7 +205,7 @@ func (p *PeersManager) AddOrUpdateRelayPoint(addr string, latency int) bool {
 		peer.SetLatency(latency)
 		return false
 	}
-	rp := &Peer{addr: addr, relay: true, idx: len(p.relayPeers), latency: latency}
+	rp := &Peer{addr: addr, relay: true, idx: len(p.relayPeers), latency: latency, lastUpdateTime: time.Now()}
 	p.relayPeers = append(p.relayPeers, rp)
 	p.peers[addr] = rp
 	return true
@@ -147,7 +218,7 @@ func (p *PeersManager) AddListenPoint(addr string) bool {
 	if _, ok := p.peers[addr]; ok {
 		return false
 	}
-	lp := &Peer{addr: addr, relay: false, idx: len(p.listenPeers)}
+	lp := &Peer{addr: addr, relay: false, idx: len(p.listenPeers), lastUpdateTime: time.Now()}
 	p.listenPeers = append(p.listenPeers, lp)
 	p.peers[addr] = lp
 	return true
@@ -192,7 +263,6 @@ func (p *PeersManager) UpdateRelayPoint(addr string, stat, latc int) {
 func (p *PeersManager) PeersConnected(addr, addr2 string) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
-	log.Println("PeersConnected " + addr + " <-> " + addr2)
 
 	if peer, ok := p.peers[addr]; ok {
 		peer.SetStatus(1)

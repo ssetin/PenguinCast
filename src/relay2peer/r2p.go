@@ -26,6 +26,16 @@ const (
 	keepAliveTimeOut    = 500
 	searchingTimeOut    = 10000
 	udpPackSize         = 512
+
+	// when call reportToServer pass that states to determine report kind
+	stateGeneral   = 0
+	stateConnected = 1
+	stateCheck     = 2
+)
+
+var (
+	// Prefix for udp message containing stream to relay. [R2P]
+	headerPrefix = []byte{82, 50, 80}
 )
 
 // PeerConnection implement net.Conn for peer connection
@@ -50,8 +60,8 @@ func (p *PeerConnection) Write(b []byte) (int, error) {
 	// we have to split data into udpPackSize (512 bytes) packets,
 	// because larger packages most likely will not be delivered.
 	// Also we have to wrap data into UDPMessage
-	for i := 0; i < bytesLen; i += udpPackSize - 8 {
-		end = i + udpPackSize - 8
+	for i := 0; i < bytesLen; i += udpPackSize - 7 {
+		end = i + udpPackSize - 7
 		if end > bytesLen {
 			end = bytesLen
 		}
@@ -131,17 +141,16 @@ func (m *UDPMessage) String() string {
 }
 
 // Marshal returns UDPMessage as []byte
-// In case of stream message: -=[crc]=-data
+// In case of stream message: R2P[crc]data
 func (m *UDPMessage) Marshal() ([]byte, error) {
 	if m.isStream {
-		result := make([]byte, 0, len(m.data)+8)
+		result := make([]byte, 0, len(m.data)+7)
 
 		crcBuf := new(bytes.Buffer)
 		binary.Write(crcBuf, binary.LittleEndian, m.crc)
 
-		result = append(result, []byte("-=")...)
+		result = append(result, headerPrefix[:]...)
 		result = append(result, crcBuf.Bytes()...)
-		result = append(result, []byte("=-")...)
 		result = append(result, m.data...)
 
 		return result, nil
@@ -150,20 +159,20 @@ func (m *UDPMessage) Marshal() ([]byte, error) {
 }
 
 // UnMarshal fills UDPMessage from []byte
-// In case of stream message: -=[crc]=-data
+// In case of stream message: R2P[crc]data
 func (m *UDPMessage) UnMarshal(msg []byte) error {
 	l := len(msg)
 	if l <= 8 {
 		m.FillGeneralData(msg)
 		return nil
 	}
-	header := msg[0:8]
+	header := msg[0:7]
 
-	if string(header[0:2]) == "-=" && string(header[6:8]) == "=-" {
-		binary.Read(bytes.NewReader(header[2:6]), binary.LittleEndian, &m.crc)
-		realCrc := crc32.ChecksumIEEE(msg[8:l])
+	if bytes.Equal(header[0:3], headerPrefix) {
+		binary.Read(bytes.NewReader(header[3:7]), binary.LittleEndian, &m.crc)
+		realCrc := crc32.ChecksumIEEE(msg[7:l])
 		if realCrc == m.crc {
-			m.data = msg[8:l]
+			m.data = msg[7:l]
 			m.isStream = true
 		} else {
 			m.FillGeneralData(msg)
@@ -228,7 +237,7 @@ func (p *PeerConnector) SetIsRelayPoint(isRelayPoint bool) {
 }
 
 // reportToServer tells managing server information about peer
-func (p *PeerConnector) reportToServer() error {
+func (p *PeerConnector) reportToServer(state int) error {
 	manConn, err := net.Dial("tcp", p.srvHost)
 	if err != nil {
 		return err
@@ -237,14 +246,15 @@ func (p *PeerConnector) reportToServer() error {
 	writer := bufio.NewWriter(manConn)
 
 	writer.WriteString("GET /Pi HTTP/1.0\r\n")
-	if p.peerAddr != nil {
+	writer.WriteString("Mount: " + p.mountName + "\r\n")
+
+	if state == stateConnected && p.peerAddr != nil {
 		writer.WriteString("Connected: " + p.publicAddr.IP.String() + ":" + strconv.Itoa(p.publicAddr.Port) + ",")
 		writer.WriteString(p.peerAddr.String() + "\r\n\r\n")
 		writer.Flush()
 		return nil
 	}
 
-	writer.WriteString("Mount: " + p.mountName + "\r\n")
 	writer.WriteString("MyAddr: " + p.publicAddr.IP.String() + ":" + strconv.Itoa(p.publicAddr.Port) + "\r\n")
 	if p.isRelayPoint {
 		writer.WriteString("Latency: ")
@@ -287,7 +297,7 @@ func (p *PeerConnector) computeMyIP(msg []byte) error {
 	if p.publicAddr.String() != xorAddr.String() {
 		p.publicAddr = xorAddr
 	}
-	p.reportToServer()
+	p.reportToServer(stateGeneral)
 	return nil
 }
 
@@ -359,6 +369,7 @@ func (p *PeerConnector) GetConnection() chan *PeerConnection {
 				// done. pass control to the stream reader
 				keepAliveTicker.Stop()
 				timeoutTicker.Stop()
+				p.reportToServer(stateConnected)
 
 				doneChan <- struct{}{}
 				udpConnChan <- &PeerConnection{conn, p.peerAddr, false}

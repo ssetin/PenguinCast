@@ -157,10 +157,10 @@ func (p *PenguinClient) readStream(streamConnection net.Conn, secToListen int) e
 	bytesToFinish := secToListen * p.bitRate * 1024 / 8
 	readedBytes := 0
 
-	// if streamConnection is relay point, data begins from 8th byte
+	// if streamConnection is relay point, data begins from 7th byte
 	startDataIdx := 0
 	if _, isPeerConnection := streamConnection.(*relay2peer.PeerConnection); isPeerConnection {
-		startDataIdx = 8
+		startDataIdx = 7
 	}
 
 	ok := false

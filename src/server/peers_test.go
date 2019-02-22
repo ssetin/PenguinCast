@@ -14,7 +14,7 @@ type SortingCR struct {
 func TestManagingPeers(t *testing.T) {
 	var manager PeersManager
 
-	manager.Init()
+	manager.Init(nil, "test")
 
 	cases := []SortingCR{SortingCR{
 		NewRelays: map[string]int{

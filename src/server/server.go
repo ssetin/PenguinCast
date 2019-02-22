@@ -19,7 +19,7 @@ import (
 
 const (
 	cServerName = "PenguinCast"
-	cVersion    = "0.9.0dev"
+	cVersion    = "0.3.01dev"
 )
 
 var (
@@ -200,18 +200,24 @@ func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
 	mountName := r.Header.Get("Mount")
 	mount := i.getMount(mountName)
 
-	if mount == nil || addr == "" {
+	if mount == nil {
+		i.printError(1, "piHandler, no Mount specified")
 		return
 	}
 
 	// two peers have agreed about the connection
 	if len(connectedAddr) > 0 {
-		pair := strings.Split(connectedAddr, ", ")
+		pair := strings.Split(connectedAddr, ",")
 		if len(pair) == 2 {
 			mount.peersManager.PeersConnected(strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1]))
 		} else {
 			return
 		}
+	}
+
+	if addr == "" {
+		i.printError(1, "piHandler, no MyAddr specified")
+		return
 	}
 
 	if isRelayPoint {

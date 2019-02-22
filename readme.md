@@ -8,6 +8,7 @@ Icecast compatible streaming audio server - server part of your internet radio s
 * Collecting and saving listening statistics to access.log file
 * Html and json interface for accessing server status (__http://host:port/info.html__ and __http://host:port/info.json__)
 * Real time server state monitoring (__http://host:port/monitor.html__)
+* Relay from peer to peer
 
 ## Configuring
 Configuration parameters are stored in config.json.

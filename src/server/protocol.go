@@ -20,6 +20,10 @@ import (
 )
 
 //223.33.152.54 - - [27/Feb/2012:13:37:21 +0300] "GET /gop_aac HTTP/1.1" 200 75638 "-" "WMPlayer/10.0.0.364 guid/3300AD50-2C39-46C0-AE0A-AC7B8159E203" 400
+func (i *IceServer) writeAccessLog(host string, startTime time.Time, request string, bytessended int, refer, userAgent string, seconds int) {
+	i.printAccess("%s - - [%s] \"%s\" %s %d \"%s\" \"%s\" %d\r\n", host, startTime.Format(time.RFC1123Z), request, "200", bytessended, refer, userAgent, seconds)
+}
+
 func (i *IceServer) closeMount(idx int, issource bool, bytessended *int, start time.Time, r *http.Request) {
 	if issource {
 		i.decSources()
@@ -30,7 +34,7 @@ func (i *IceServer) closeMount(idx int, issource bool, bytessended *int, start t
 	}
 	t := time.Now()
 	elapsed := t.Sub(start)
-	i.printAccess("%s - - [%s] \"%s\" %s %d \"%s\" \"%s\" %d\r\n", i.getHost(r.RemoteAddr), start.Format(time.RFC1123Z), r.Method+" "+r.RequestURI+" "+r.Proto, "200", *bytessended, r.Referer(), r.UserAgent(), int(elapsed.Seconds()))
+	i.writeAccessLog(i.getHost(r.RemoteAddr), start, r.Method+" "+r.RequestURI+" "+r.Proto, *bytessended, r.Referer(), r.UserAgent(), int(elapsed.Seconds()))
 }
 
 func (i *IceServer) getHost(addr string) string {

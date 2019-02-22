@@ -87,7 +87,7 @@ func (m *Mount) Init(srv *IceServer) error {
 
 	pool := m.Server.poolManager.Init(m.BitRate * 1024 / 8)
 	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8)+2, pool)
-	m.peersManager.Init()
+	m.peersManager.Init(srv.writeAccessLog, m.Name)
 
 	return nil
 }
@@ -97,6 +97,7 @@ func (m *Mount) Close() {
 	if m.dumpFile != nil {
 		m.dumpFile.Close()
 	}
+	m.peersManager.Close()
 }
 
 //Clear ...

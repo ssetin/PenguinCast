@@ -1,4 +1,4 @@
-# Relay to peer protocol
+# Relay to peer
 
 Each listener potentially could be a relay point for listeners of the same mount point by p2p connection. So there is way to tell server about that fact for one client and to get information about such relay for another.  
 The following HTTP requests are about it:
@@ -53,6 +53,7 @@ Address: [IP:PORT:IP:PORT:IP:PORT]
 
 ```http
 GET /Pi HTTP/1.0
+Mount: [MountName]
 Connected: [IP:PORT, IP:PORT]
 ```
 
@@ -96,11 +97,11 @@ niceToMeetYouRelay
 UDPMessage
 ```
 
-UDPMessage consist of data begins from 8th byte, checksum and header marks at 00,01 and 06,07th bytes:  
+UDPMessage consist of data begins from 8th byte, checksum and header prefix:  
 
-        byte | 00 | 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08
-        ---- | -- | -- | -- | -- | -- | -- | -- | -- | --
-         val | 45 | 61 |    CRC32(data)    | 61 | 45 | data ...
+        byte | 00 | 01 | 02 | 03 | 04 | 05 | 06 | 07 
+        ---- | -- | -- | -- | -- | -- | -- | -- | --
+         val |  R |  2 |  P |    CRC32(data)    | data ...
 
 ### Listener point
 14. After sending answer, wait for UDPMessage with stream and start receiving data
