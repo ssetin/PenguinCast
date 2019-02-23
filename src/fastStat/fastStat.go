@@ -1,6 +1,9 @@
-// Package fastStat - read current process stat from /proc/[pid]/stat
-// used for CPU and memory usage monitoring
-package fastStat
+// Copyright 2019 Setin Sergei
+// Licensed under the Apache License, Version 2.0 (the "License")
+
+// Package faststat - read current process stat from /proc/[pid]/stat.
+// Used for CPU and memory usage monitoring
+package faststat
 
 /* #include <unistd.h> */
 import "C"

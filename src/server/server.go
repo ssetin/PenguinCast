@@ -1,4 +1,6 @@
-// Package iceserver - icecast streaming server
+// Copyright 2019 Setin Sergei
+// Licensed under the Apache License, Version 2.0 (the "License")
+
 package iceserver
 
 import (
@@ -14,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ssetin/PenguinCast/src/fastStat"
+	faststat "github.com/ssetin/PenguinCast/src/fastStat"
 )
 
 const (
@@ -39,7 +41,7 @@ type IceServer struct {
 	ListenersCount int32
 	SourcesCount   int32
 
-	statReader fastStat.ProcStatsReader
+	statReader faststat.ProcStatsReader
 	// for monitor
 	cpuUsage float64
 	memUsage int

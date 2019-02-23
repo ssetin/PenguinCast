@@ -1,5 +1,7 @@
 # PenguinCast
 
+[![GoDoc](https://godoc.org/github.com/ssetin/PenguinCast?status.svg)](https://godoc.org/github.com/ssetin/PenguinCast)
+
 Icecast compatible streaming audio server - server part of your internet radio station.
 
 ## Capabilities
@@ -8,7 +10,7 @@ Icecast compatible streaming audio server - server part of your internet radio s
 * Collecting and saving listening statistics to access.log file
 * Html and json interface for accessing server status (__http://host:port/info.html__ and __http://host:port/info.json__)
 * Real time server state monitoring (__http://host:port/monitor.html__)
-* Relay from peer to peer
+* Relay from peer to peer (under development)
 
 ## Configuring
 Configuration parameters are stored in config.json.
