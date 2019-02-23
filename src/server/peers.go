@@ -4,7 +4,6 @@
 package iceserver
 
 import (
-	"log"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -12,10 +11,6 @@ import (
 )
 
 // ============================== peer ===================================
-
-const (
-	peerLifeTimeUpdateTimeOut = 15 // sec
-)
 
 // Peer ...
 type Peer struct {
@@ -42,6 +37,9 @@ type Peer struct {
 
 // AddCandidate add listener who get this peer as possible relay point
 func (p *Peer) AddCandidate(listener *Peer) {
+	if listener == nil {
+		return
+	}
 	p.mux.Lock()
 	defer p.mux.Unlock()
 	if p.candidates == nil {
@@ -92,7 +90,7 @@ func (p *Peer) SetStatusLatency(newstat, newlat int) {
 	p.lastUpdateTime = time.Now()
 }
 
-// GetCandidates get candidates addresses to connect
+// GetCandidates get candidates(listeners) addresses to connect
 func (p *Peer) GetCandidates() []string {
 	result := make([]string, 0, 3)
 	p.mux.Lock()
@@ -145,19 +143,23 @@ type PeersManager struct {
 	peers map[string]*Peer
 
 	// callback for writing log about peers
-	writeLog         callbackWriteLog
-	startedInspector int32
-	mountName        string
-	wg               sync.WaitGroup
+	writeLog                  callbackWriteLog
+	startedInspector          int32
+	inspectorTick             int64
+	peerLifeTimeUpdateTimeOut int64
+	mountName                 string
+	wg                        sync.WaitGroup
 }
 
 // Init - init collections, set callback for writing log
-func (p *PeersManager) Init(cb callbackWriteLog, mountName string) {
+func (p *PeersManager) Init(cb callbackWriteLog, mountName string, inspectorTick int64, peerLifeTimeUpdateTimeOut int64) {
 	p.relayPeers = make(peersCollection, 0, 10)
 	p.listenPeers = make(peersCollection, 0, 10)
 	p.peers = make(map[string]*Peer)
 	p.writeLog = cb
 	p.mountName = mountName
+	p.inspectorTick = inspectorTick
+	p.peerLifeTimeUpdateTimeOut = peerLifeTimeUpdateTimeOut
 	atomic.StoreInt32(&p.startedInspector, 1)
 	p.wg.Add(1)
 
@@ -173,7 +175,7 @@ func (p *PeersManager) Close() {
 
 // watching for peers status
 func (p *PeersManager) inspector() {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(time.Second * time.Duration(p.inspectorTick))
 	defer ticker.Stop()
 	defer p.wg.Done()
 
@@ -186,12 +188,11 @@ func (p *PeersManager) inspector() {
 		for adr, peer := range p.peers {
 			// if lastUpdateTime of this peer is more then 10 secs, let consider it closed
 			// temp. leave relay alone
-			if time.Since(peer.lastUpdateTime) > time.Second*peerLifeTimeUpdateTimeOut {
+			if time.Since(peer.lastUpdateTime) > time.Second*time.Duration(p.peerLifeTimeUpdateTimeOut) {
 				if !peer.relay && p.writeLog != nil {
 					p.writeLog(adr, peer.connectedTime, "GET /"+p.mountName+" UDP", 0, "-", "penguinClient", int(time.Since(peer.connectedTime).Seconds()))
 					p.deletePeer(peer)
 				}
-				continue
 			}
 		}
 		p.mux.Unlock()
@@ -240,12 +241,14 @@ func (p *PeersManager) GetPeer(addr string) *Peer {
 
 // deletePeer delete peer from collections
 func (p *PeersManager) deletePeer(item *Peer) {
-	log.Printf("delete peer %s", item.addr)
+	//log.Printf("delete peer %s", item.addr)
 	if item.relay {
 		p.relayPeers[item.idx] = p.relayPeers[len(p.relayPeers)-1]
+		p.relayPeers[item.idx].idx = item.idx
 		p.relayPeers = p.relayPeers[:len(p.relayPeers)-1]
 	} else {
 		p.listenPeers[item.idx] = p.listenPeers[len(p.listenPeers)-1]
+		p.listenPeers[item.idx].idx = item.idx
 		p.listenPeers = p.listenPeers[:len(p.listenPeers)-1]
 	}
 	delete(p.peers, item.addr)
@@ -288,6 +291,7 @@ func (p *PeersManager) GetTop3RelayPoints(listenerAddr string) []string {
 
 	for i, rp := range p.relayPeers {
 		if i > 2 || rp.status > 0 {
+			//log.Printf("skip. stat:%d i:%d, %s\n", rp.status, i, listenerAddr)
 			break
 		}
 		rp.AddCandidate(listenerPeer)
