@@ -116,7 +116,7 @@ func TestManagingPeers(t *testing.T) {
 	// check update time
 	time.Sleep(time.Millisecond * 100)
 	peer2.Update()
-	if !peer2.lastUpdateTime.After(peer2.connectedTime) {
+	if !peer2.GetLastUpdateTime().After(peer2.GetConnectedTime()) {
 		t.Errorf("Check update time. Expected: lastUpdateTime [%v] > connectedTime [%v]\n", peer2.lastUpdateTime, peer2.connectedTime)
 	}
 

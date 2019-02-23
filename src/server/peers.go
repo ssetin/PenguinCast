@@ -48,6 +48,20 @@ func (p *Peer) AddCandidate(listener *Peer) {
 	p.candidates = append(p.candidates, listener)
 }
 
+// GetLastUpdateTime returns lastUpdateTime
+func (p *Peer) GetLastUpdateTime() time.Time {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+	return p.lastUpdateTime
+}
+
+// GetConnectedTime returns connectedTime
+func (p *Peer) GetConnectedTime() time.Time {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+	return p.connectedTime
+}
+
 // ClearCandidates delete all candidates
 func (p *Peer) ClearCandidates() {
 	p.mux.Lock()
@@ -179,6 +193,8 @@ func (p *PeersManager) inspector() {
 	defer ticker.Stop()
 	defer p.wg.Done()
 
+	var pConnTime, pUpdtime time.Time
+
 	for {
 		if atomic.LoadInt32(&p.startedInspector) == 0 {
 			break
@@ -188,9 +204,12 @@ func (p *PeersManager) inspector() {
 		for adr, peer := range p.peers {
 			// if lastUpdateTime of this peer is more then 10 secs, let consider it closed
 			// temp. leave relay alone
-			if time.Since(peer.lastUpdateTime) > time.Second*time.Duration(p.peerLifeTimeUpdateTimeOut) {
+			pUpdtime = peer.GetLastUpdateTime()
+
+			if time.Since(pUpdtime) > time.Second*time.Duration(p.peerLifeTimeUpdateTimeOut) {
 				if !peer.relay && p.writeLog != nil {
-					p.writeLog(adr, peer.connectedTime, "GET /"+p.mountName+" UDP", 0, "-", "penguinClient", int(time.Since(peer.connectedTime).Seconds()))
+					pConnTime = peer.GetConnectedTime()
+					p.writeLog(adr, pConnTime, "GET /"+p.mountName+" UDP", 0, "-", "penguinClient", int(time.Since(pConnTime).Seconds()))
 					p.deletePeer(peer)
 				}
 			}

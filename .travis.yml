@@ -8,6 +8,6 @@ before_script:
 - go get -u github.com/mattn/goveralls
 
 script:
-- go test -v -covermode=count -coverprofile=cover.out ./src/relay2peer/ ./src/server/
+- go test -v -race -covermode=atomic -coverprofile=cover.out ./src/relay2peer/ ./src/server/
 - goveralls -v -coverprofile=cover.out -service=travis-ci -repotoken $COVERALLS_TOKEN
 - go build -v
