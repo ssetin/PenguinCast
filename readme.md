@@ -1,6 +1,8 @@
 # PenguinCast
 
 [![GoDoc](https://godoc.org/github.com/ssetin/PenguinCast?status.svg)](https://godoc.org/github.com/ssetin/PenguinCast)
+[![Build Status](https://travis-ci.org/ssetin/PenguinCast.svg?branch=master)](https://travis-ci.org/ssetin/PenguinCast)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ssetin/PenguinCast)](https://goreportcard.com/report/github.com/ssetin/PenguinCast)
 
 Icecast compatible streaming audio server - server part of your internet radio station.
 

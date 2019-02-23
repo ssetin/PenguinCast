@@ -138,7 +138,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	i.printError(3, "readMount "+mount.Name)
 	defer i.closeMount(idx, false, &bytessended, start, r)
 
-	//try to maximize unused buffer pages from begining
+	//try to maximize unused buffer pages from beginning
 	pack = mount.buffer.Start(mount.BurstSize)
 
 	if pack == nil {

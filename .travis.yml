@@ -3,7 +3,11 @@ language: go
 go: 
 - "1.11.x"
  
+before_script:
+- go get golang.org/x/tools/cmd/cover
+- go get -u github.com/mattn/goveralls
+
 script:
-- go test -v ./src/relay2peer/
-- go test -v ./src/server/  
+- go test -v -covermode=count -coverprofile=cover.out ./src/relay2peer/ ./src/server/
+- goveralls -v -coverprofile=cover.out -service=travis-ci -repotoken $COVERALLS_TOKEN
 - go build -v

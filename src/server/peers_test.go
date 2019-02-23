@@ -16,6 +16,7 @@ type SortingCR struct {
 
 func TestManagingPeers(t *testing.T) {
 	var manager PeersManager
+	var top3 []string
 
 	manager.Init(nil, "test")
 
@@ -48,7 +49,7 @@ func TestManagingPeers(t *testing.T) {
 		}
 
 		// sort and get top3
-		top3 := manager.GetTop3RelayPoints("")
+		top3 = manager.GetTop3RelayPoints("")
 
 		// remove after sort
 		for _, del := range cs.DeleteRelays {

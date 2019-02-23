@@ -235,7 +235,7 @@ func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
 		if mount.peersManager.AddListenPoint(addr) {
 			log.Println("New listen point: " + addr)
 		} else {
-			// TODO: process recieved checksums
+			// TODO: process received checksums
 			if len(check) > 0 {
 				mount.peersManager.GetPeer(addr).Update()
 			}
