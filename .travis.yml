@@ -1,3 +1,11 @@
 language: go
 go: 
- - "1.10.x"
+ - "1.11.x"
+
+ script:
+  - cd ./src/relay2peer/
+  - go test -v -cover r2p_test.go r2p.go headers.go
+  - cd ../server/
+  - go test -v -cover peers_test.go peers.go
+  - cd ../../
+  - go build -v
