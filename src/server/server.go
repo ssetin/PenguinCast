@@ -191,10 +191,6 @@ func (i *IceServer) checkIsCommand(page string, r *http.Request) int {
 
 // piHandler handler to manage p2p connections
 func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
-	if i.Props.Logging.Loglevel == 4 {
-		i.logHeaders(w, r)
-	}
-
 	isRelayPoint := false
 	addr := r.Header.Get("MyAddr")
 	connectedAddr := r.Header.Get("Connected")
@@ -212,13 +208,11 @@ func (i *IceServer) piHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// two peers have agreed about the connection
-	if len(connectedAddr) > 0 {
-		pair := strings.Split(connectedAddr, ",")
-		if len(pair) == 2 {
-			mount.peersManager.PeersConnected(strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1]))
-		} else {
-			return
-		}
+	pair := strings.Split(connectedAddr, ",")
+	if len(pair) == 2 {
+		mount.peersManager.PeersConnected(strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1]))
+	} else {
+		return
 	}
 
 	if addr == "" {

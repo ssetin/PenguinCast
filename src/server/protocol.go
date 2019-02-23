@@ -102,6 +102,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	var mount *Mount
 	var meta []byte
 	var err error
+	var beginIteration time.Time
 	var pack, nextpack *BufElement
 
 	bytessended := 0
@@ -114,7 +115,6 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	partwrited := 0
 	nmtmp := 0
 	delta := 0
-	beginIteration := time.Now()
 	metalen := 0
 	n := 0
 

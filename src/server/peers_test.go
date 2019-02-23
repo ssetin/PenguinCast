@@ -20,7 +20,7 @@ func TestManagingPeers(t *testing.T) {
 
 	manager.Init(nil, "test")
 
-	cases := []SortingCR{SortingCR{
+	cases := []SortingCR{{
 		NewRelays: map[string]int{
 			"192.168.45.13:19919": 110,
 			"192.168.45.16:39919": 140,
@@ -48,8 +48,8 @@ func TestManagingPeers(t *testing.T) {
 			manager.UpdateRelayPoint(item, 0, lat)
 		}
 
-		// sort and get top3
-		top3 = manager.GetTop3RelayPoints("")
+		// sort and "get" top3
+		manager.GetTop3RelayPoints("")
 
 		// remove after sort
 		for _, del := range cs.DeleteRelays {

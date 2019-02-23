@@ -88,7 +88,7 @@ func (p *PenguinClient) sayHello(writer *bufio.Writer) error {
 func (p *PenguinClient) Listen(secToListen int) error {
 	var err error
 	var streamConnection net.Conn
-	ok := false
+	var ok bool
 
 	p.conn, err = net.Dial("tcp", p.host)
 	if err != nil {
@@ -155,6 +155,7 @@ func (p *PenguinClient) readStream(streamConnection net.Conn, secToListen int) e
 	var beginIteration time.Time
 	var r2pConnection *relay2peer.PeerConnection
 	var r2pChan chan *relay2peer.PeerConnection
+	var ok bool
 
 	bytesToFinish := secToListen * p.bitRate * 1024 / 8
 	readedBytes := 0
@@ -166,7 +167,6 @@ func (p *PenguinClient) readStream(streamConnection net.Conn, secToListen int) e
 		startDataIdx = 7
 	}
 
-	ok := false
 	sndBuff := make([]byte, 1024*p.bitRate/8)
 
 	if p.iCan {
