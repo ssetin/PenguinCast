@@ -133,13 +133,13 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 
 	if strAuth == "" {
 		m.saySourceHello(w, r)
-		return errors.New("No authorization field")
+		return errors.New("no authorization field")
 	}
 
 	s := strings.SplitN(strAuth, " ", 2)
 	if len(s) != 2 {
 		http.Error(w, "Not authorized", 401)
-		return errors.New("Not authorized")
+		return errors.New("not authorized")
 	}
 
 	b, err := base64.StdEncoding.DecodeString(s[1])
@@ -151,12 +151,12 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 	pair := strings.SplitN(string(b), ":", 2)
 	if len(pair) != 2 {
 		http.Error(w, "Not authorized", 401)
-		return errors.New("Not authorized")
+		return errors.New("not authorized")
 	}
 
 	if m.Password != pair[1] && m.User != pair[0] {
 		http.Error(w, "Not authorized", 401)
-		return errors.New("Wrong user or password")
+		return errors.New("wrong user or password")
 	}
 
 	m.saySourceHello(w, r)
@@ -220,7 +220,7 @@ func (m *Mount) saySourceHello(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 }
 
-func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
+func (m *Mount) setBitrate(r *http.Request) {
 	var bitratestr string
 	bitratestr = r.Header.Get("ice-bitrate")
 	if bitratestr == "" {
@@ -231,13 +231,16 @@ func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	brate, err := strconv.Atoi(bitratestr)
-	if err != nil {
-		m.BitRate = 0
-	} else {
-		m.BitRate = brate
+	if bitratestr != "" {
+		brate, err := strconv.Atoi(bitratestr)
+		if err == nil {
+			m.BitRate = brate
+		}
 	}
+}
 
+func (m *Mount) setICEHeaders(w http.ResponseWriter, r *http.Request) {
+	m.setBitrate(r)
 	m.Genre = r.Header.Get("ice-genre")
 	m.ContentType = r.Header.Get("content-type")
 	m.Description = r.Header.Get("ice-description")

@@ -104,7 +104,6 @@ func (q *BufferQueue) newBufElement(buffer []byte, readed int) *BufElement {
 
 	t.buffer = q.pool.Get().([]byte)
 	t.buffer = t.buffer[:readed]
-	//t.buffer = make([]byte, readed)
 	t.len = readed
 	copy(t.buffer, buffer)
 	return t
@@ -182,7 +181,6 @@ func (q *BufferQueue) Start(burstSize int) *BufElement {
 		burst += t.len
 		t = t.prev
 	}
-
 	return t
 }
 

@@ -153,6 +153,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	i.incListeners()
 	mount.incListeners()
 
+OuterLoop:
 	for {
 		beginIteration = time.Now()
 		conn.SetWriteDeadline(time.Now().Add(writeTimeOut))
@@ -230,8 +231,8 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 			time.Sleep(time.Millisecond * 250)
 			idle += 250
 			if idle >= idleTimeOut {
-				i.closeAndUnlock(pack, errors.New("Empty Buffer idle time is reached"))
-				break
+				i.closeAndUnlock(pack, errors.New("empty Buffer idle time is reached"))
+				break OuterLoop
 			}
 			nextpack = pack.Next()
 		}
@@ -258,7 +259,7 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 			i.printError(1, err.Error())
 			return
 		}
-		mount.writeICEHeaders(w, r)
+		mount.setICEHeaders(w, r)
 		mount.State.Started = true
 		mount.State.StartedTime = time.Now()
 		mount.mux.Unlock()
