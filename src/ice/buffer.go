@@ -1,7 +1,7 @@
 // Copyright 2019 Setin Sergei
 // Licensed under the Apache License, Version 2.0 (the "License")
 
-package iceserver
+package ice
 
 import (
 	"sync"
@@ -50,7 +50,7 @@ func (q *BufElement) Reset(pool *sync.Pool) {
 		q.prev.next = nil
 		q.prev = nil
 	}
-	//q.buffer = nil
+
 	q.buffer = q.buffer[:0]
 	pool.Put(q.buffer)
 }
@@ -83,12 +83,12 @@ func (q *BufElement) IsLocked() bool {
 //***************************************
 
 // Init - initiates buffer queue
-func (q *BufferQueue) Init(minsize int, pool *sync.Pool) {
+func (q *BufferQueue) Init(minSize int, pool *sync.Pool) {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	q.size = 0
-	q.maxBufferSize = minsize * 8
-	q.minBufferSize = minsize
+	q.maxBufferSize = minSize * 8
+	q.minBufferSize = minSize
 	q.first = nil
 	q.last = nil
 	q.pool = pool

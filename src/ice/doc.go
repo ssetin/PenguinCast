@@ -2,6 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (the "License")
 
 /*
-Package relay2peer implement p2p connections
+Package ice - iceCast streaming server
 */
-package relay2peer
+package ice

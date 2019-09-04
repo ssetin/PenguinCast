@@ -1,20 +1,20 @@
 // Copyright 2019 Setin Sergei
 // Licensed under the Apache License, Version 2.0 (the "License")
 
-package iceserver
+package pool
 
 import (
 	"errors"
 	"sync"
 )
 
-// PoolManager ...
-type PoolManager struct {
+// Manager ...
+type Manager struct {
 	pages map[int]*sync.Pool
 }
 
 // Init ...
-func (p *PoolManager) Init(size int) *sync.Pool {
+func (p *Manager) Init(size int) *sync.Pool {
 
 	if p.pages == nil {
 		p.pages = make(map[int]*sync.Pool)
@@ -34,9 +34,9 @@ func (p *PoolManager) Init(size int) *sync.Pool {
 }
 
 // GetPool ...
-func (p *PoolManager) GetPool(size int) (*sync.Pool, error) {
+func (p *Manager) GetPool(size int) (*sync.Pool, error) {
 	if pool, ok := p.pages[size]; ok {
 		return pool, nil
 	}
-	return nil, errors.New("No pool according to that size. You have to initialize it")
+	return nil, errors.New("no pool according to that size. You have to initialize it")
 }

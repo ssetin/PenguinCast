@@ -1,9 +1,9 @@
 // Copyright 2019 Setin Sergei
 // Licensed under the Apache License, Version 2.0 (the "License")
 
-// Package faststat - read current process stat from /proc/[pid]/stat.
+// Package stat - read current process stat from /proc/[pid]/stat.
 // Used for CPU and memory usage monitoring
-package faststat
+package stat
 
 /* #include <unistd.h> */
 import "C"
@@ -102,7 +102,7 @@ func (p *ProcStatsReader) read() (*ProcStats, error) {
 	}
 	splitAfter := strings.SplitAfter(string(buf[:n]), ")")
 	if len(splitAfter) == 0 || len(splitAfter) == 1 {
-		return nil, errors.New("Error parsing /proc/%d/stat")
+		return nil, errors.New("error parsing /proc/%d/stat")
 	}
 
 	uptimeBytes, err := ioutil.ReadFile(path.Join("/proc", "uptime"))

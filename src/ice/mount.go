@@ -1,7 +1,7 @@
 // Copyright 2019 Setin Sergei
 // Licensed under the Apache License, Version 2.0 (the "License")
 
-package iceserver
+package ice
 
 import (
 	"bufio"
@@ -19,25 +19,20 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ssetin/PenguinCast/src/config"
+
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/transform"
 )
 
-// TODO:
-// - peer should compare checksum of the received packets with server to ensure that packets are original
-// - process statistics about p2p connections
-// - show peers on stat page
-
-// MetaData ...
-type MetaData struct {
+type metaData struct {
 	MetaInt      int
 	StreamTitle  string
 	meta         []byte
 	metaSizeByte int
 }
 
-// MountInfo ...
-type MountInfo struct {
+type mountInfo struct {
 	Name      string
 	Listeners int32
 	UpTime    string
@@ -46,51 +41,40 @@ type MountInfo struct {
 
 // Mount ...
 type Mount struct {
-	Name         string `json:"Name"`
-	User         string `json:"User"`
-	Password     string `json:"Password"`
-	Description  string `json:"Description"`
-	BitRate      int    `json:"BitRate"`
-	ContentType  string `json:"ContentType"`
-	StreamURL    string `json:"StreamURL"`
-	Genre        string `json:"Genre"`
-	BurstSize    int    `json:"BurstSize"`
-	DumpFile     string `json:"DumpFile"`
-	MaxListeners int    `json:"MaxListeners"`
+	Options     config.MountOptions
+	ContentType string
+	StreamURL   string
 
 	State struct {
 		Started     bool
 		StartedTime time.Time
-		MetaInfo    MetaData
+		MetaInfo    metaData
 		Listeners   int32
-	} `json:"-"`
-
-	// p2p relays stuff
-	peersManager PeersManager
+	}
 
 	mux      sync.Mutex
-	Server   *IceServer `json:"-"`
 	buffer   BufferQueue
+	server   *Server
 	dumpFile *os.File
 }
 
 //Init ...
-func (m *Mount) Init(srv *IceServer) error {
-	m.Server = srv
+func (m *Mount) Init(srv *Server, opt config.MountOptions) error {
+	m.server = srv
+	m.Options = opt
 	m.Clear()
-	m.State.MetaInfo.MetaInt = m.BitRate * 1024 / 8 * 10
+	m.State.MetaInfo.MetaInt = opt.BitRate * 1024 / 8 * 10
 
-	if m.DumpFile > "" {
+	if opt.DumpFile > "" {
 		var err error
-		m.dumpFile, err = os.OpenFile(srv.Props.Paths.Log+m.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
+		m.dumpFile, err = os.OpenFile(opt.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
 		if err != nil {
 			return err
 		}
 	}
 
-	pool := m.Server.poolManager.Init(m.BitRate * 1024 / 8)
-	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8)+2, pool)
-	m.peersManager.Init(srv.writeAccessLog, m.Name, 5, 15)
+	pool := m.server.poolManager.Init(opt.BitRate * 1024 / 8)
+	m.buffer.Init(opt.BurstSize/(opt.BitRate*1024/8)+2, pool)
 
 	return nil
 }
@@ -100,7 +84,6 @@ func (m *Mount) Close() {
 	if m.dumpFile != nil {
 		m.dumpFile.Close()
 	}
-	m.peersManager.Close()
 }
 
 //Clear ...
@@ -111,7 +94,7 @@ func (m *Mount) Clear() {
 	m.State.StartedTime = time.Time{}
 	m.zeroListeners()
 	m.State.MetaInfo.StreamTitle = ""
-	m.StreamURL = "http://" + m.Server.Props.Host + ":" + strconv.Itoa(m.Server.Props.Socket.Port) + "/" + m.Name
+	m.StreamURL = "http://" + m.server.Options.Host + ":" + strconv.Itoa(m.server.Options.Socket.Port) + "/" + m.Options.Name
 }
 
 func (m *Mount) incListeners() {
@@ -133,13 +116,13 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 
 	if strAuth == "" {
 		m.saySourceHello(w, r)
-		return errors.New("No authorization field")
+		return errors.New("no authorization field")
 	}
 
 	s := strings.SplitN(strAuth, " ", 2)
 	if len(s) != 2 {
 		http.Error(w, "Not authorized", 401)
-		return errors.New("Not authorized")
+		return errors.New("not authorized")
 	}
 
 	b, err := base64.StdEncoding.DecodeString(s[1])
@@ -151,12 +134,12 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 	pair := strings.SplitN(string(b), ":", 2)
 	if len(pair) != 2 {
 		http.Error(w, "Not authorized", 401)
-		return errors.New("Not authorized")
+		return errors.New("not authorized")
 	}
 
-	if m.Password != pair[1] && m.User != pair[0] {
+	if m.Options.Password != pair[1] && m.Options.User != pair[0] {
 		http.Error(w, "Not authorized", 401)
-		return errors.New("Wrong user or password")
+		return errors.New("wrong user or password")
 	}
 
 	m.saySourceHello(w, r)
@@ -164,9 +147,9 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (m *Mount) getParams(paramstr string) map[string]string {
+func (m *Mount) getParams(paramStr string) map[string]string {
 	var rex = regexp.MustCompile("(\\w+)=(\\w+)")
-	data := rex.FindAllStringSubmatch(paramstr, -1)
+	data := rex.FindAllStringSubmatch(paramStr, -1)
 	params := make(map[string]string)
 	for _, kv := range data {
 		k := kv[1]
@@ -176,28 +159,28 @@ func (m *Mount) getParams(paramstr string) map[string]string {
 	return params
 }
 
-func (m *Mount) sayListenerHello(w *bufio.ReadWriter, icymeta bool) {
+func (m *Mount) sayListenerHello(w *bufio.ReadWriter, icyMeta bool) {
 	w.WriteString("HTTP/1.0 200 OK\r\n")
 	w.WriteString("Server: ")
-	w.WriteString(m.Server.serverName)
+	w.WriteString(m.server.serverName)
 	w.WriteString(" ")
-	w.WriteString(m.Server.version)
+	w.WriteString(m.server.version)
 	w.WriteString("\r\nContent-Type: ")
 	w.WriteString(m.ContentType)
 	w.WriteString("\r\nConnection: Keep-Alive\r\n")
 	w.WriteString("X-Audiocast-Bitrate: ")
-	w.WriteString(strconv.Itoa(m.BitRate))
+	w.WriteString(strconv.Itoa(m.Options.BitRate))
 	w.WriteString("\r\nX-Audiocast-Name: ")
-	w.WriteString(m.Name)
+	w.WriteString(m.Options.Name)
 	w.WriteString("\r\nX-Audiocast-Genre: ")
-	w.WriteString(m.Genre)
+	w.WriteString(m.Options.Genre)
 	w.WriteString("\r\nX-Audiocast-Url: ")
 	w.WriteString(m.StreamURL)
 	w.WriteString("\r\nX-Audiocast-Public: 0\r\n")
 	w.WriteString("X-Audiocast-Description: ")
-	w.WriteString(m.Description)
+	w.WriteString(m.Options.Description)
 	w.WriteString("\r\n")
-	if icymeta {
+	if icyMeta {
 		w.WriteString("Icy-Metaint: ")
 		w.WriteString(strconv.Itoa(m.State.MetaInfo.MetaInt))
 		w.WriteString("\r\n")
@@ -207,7 +190,7 @@ func (m *Mount) sayListenerHello(w *bufio.ReadWriter, icymeta bool) {
 }
 
 func (m *Mount) saySourceHello(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Server", m.Server.serverName+"/"+m.Server.version)
+	w.Header().Set("Server", m.server.serverName+"/"+m.server.version)
 	w.Header().Set("Connection", "Keep-Alive")
 	w.Header().Set("Allow", "GET, SOURCE")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -221,26 +204,26 @@ func (m *Mount) saySourceHello(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
-	var bitratestr string
-	bitratestr = r.Header.Get("ice-bitrate")
-	if bitratestr == "" {
-		audioinfo := r.Header.Get("ice-audio-info")
-		if len(audioinfo) > 3 {
-			params := m.getParams(audioinfo)
-			bitratestr = params["bitrate"]
+	var bitRateStr string
+	bitRateStr = r.Header.Get("ice-bitrate")
+	if bitRateStr == "" {
+		audioInfo := r.Header.Get("ice-audio-info")
+		if len(audioInfo) > 3 {
+			params := m.getParams(audioInfo)
+			bitRateStr = params["bitrate"]
 		}
 	}
 
-	brate, err := strconv.Atoi(bitratestr)
+	bRate, err := strconv.Atoi(bitRateStr)
 	if err != nil {
-		m.BitRate = 0
+		m.Options.BitRate = 0
 	} else {
-		m.BitRate = brate
+		m.Options.BitRate = bRate
 	}
 
-	m.Genre = r.Header.Get("ice-genre")
+	m.Options.Genre = r.Header.Get("ice-genre")
 	m.ContentType = r.Header.Get("content-type")
-	m.Description = r.Header.Get("ice-description")
+	m.Options.Description = r.Header.Get("ice-description")
 }
 
 func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
@@ -250,7 +233,7 @@ func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var metaSize byte
-	var mstr string
+	var mStr string
 	song := r.URL.Query().Get("song")
 	songReader := strings.NewReader(song)
 	enc, _, _ := charset.DetermineEncoding(([]byte)(song), "")
@@ -268,18 +251,18 @@ func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
 	m.State.MetaInfo.StreamTitle = string(result[:])
 
 	if m.State.MetaInfo.StreamTitle > "" {
-		mstr = "StreamTitle='" + m.State.MetaInfo.StreamTitle + "';"
+		mStr = "StreamTitle='" + m.State.MetaInfo.StreamTitle + "';"
 	} else {
-		mstr += "StreamTitle='" + m.Description + "';"
+		mStr += "StreamTitle='" + m.Options.Description + "';"
 	}
 
-	metaSize = byte(math.Ceil(float64(len(mstr)) / 16.0))
+	metaSize = byte(math.Ceil(float64(len(mStr)) / 16.0))
 	m.State.MetaInfo.metaSizeByte = int(metaSize)*16 + 1
 	m.State.MetaInfo.meta = make([]byte, m.State.MetaInfo.metaSizeByte)
 	m.State.MetaInfo.meta[0] = metaSize
 
-	for idx := 0; idx < len(mstr); idx++ {
-		m.State.MetaInfo.meta[idx+1] = mstr[idx]
+	for idx := 0; idx < len(mStr); idx++ {
+		m.State.MetaInfo.meta[idx+1] = mStr[idx]
 	}
 	m.mux.Unlock()
 }
@@ -294,11 +277,11 @@ func fmtDuration(d time.Duration) string {
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
 
-func (m *Mount) getMountsInfo() MountInfo {
-	var t MountInfo
+func (m *Mount) getMountsInfo() mountInfo {
+	var t mountInfo
 	t.Listeners = atomic.LoadInt32(&m.State.Listeners)
 	m.mux.Lock()
-	t.Name = m.Name
+	t.Name = m.Options.Name
 	if m.State.Started {
 		t.UpTime = fmtDuration(time.Since(m.State.StartedTime))
 		t.Buff = m.buffer.Info()

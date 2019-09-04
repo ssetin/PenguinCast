@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 
-	iceserver "github.com/ssetin/PenguinCast/src/server"
+	"github.com/ssetin/PenguinCast/src/ice"
 )
 
 func main() {
-	var IcySrv iceserver.IceServer
+	var IcySrv ice.Server
 
 	err := IcySrv.Init()
 	if err != nil {

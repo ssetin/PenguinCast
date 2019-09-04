@@ -1,11 +1,7 @@
 // Copyright 2019 Setin Sergei
 // Licensed under the Apache License, Version 2.0 (the "License")
 
-package iceserver
-
-/*
-	TODO:
-*/
+package ice
 
 import (
 	"bufio"
@@ -22,24 +18,24 @@ import (
 )
 
 //223.33.152.54 - - [27/Feb/2012:13:37:21 +0300] "GET /gop_aac HTTP/1.1" 200 75638 "-" "WMPlayer/10.0.0.364 guid/3300AD50-2C39-46C0-AE0A-AC7B8159E203" 400
-func (i *IceServer) writeAccessLog(host string, startTime time.Time, request string, bytessended int, refer, userAgent string, seconds int) {
-	i.printAccess("%s - - [%s] \"%s\" %s %d \"%s\" \"%s\" %d\r\n", host, startTime.Format(time.RFC1123Z), request, "200", bytessended, refer, userAgent, seconds)
+func (i *Server) writeAccessLog(host string, startTime time.Time, request string, bytesSend int, refer, userAgent string, seconds int) {
+	i.logger.Access("%s - - [%s] \"%s\" %s %d \"%s\" \"%s\" %d\r\n", host, startTime.Format(time.RFC1123Z), request, "200", bytesSend, refer, userAgent, seconds)
 }
 
-func (i *IceServer) closeMount(idx int, issource bool, bytessended *int, start time.Time, r *http.Request) {
-	if issource {
+func (i *Server) closeMount(idx int, isSource bool, bytesSend *int, start time.Time, r *http.Request) {
+	if isSource {
 		i.decSources()
-		i.Props.Mounts[idx].Clear()
+		i.Mounts[idx].Clear()
 	} else {
-		i.Props.Mounts[idx].decListeners()
+		i.Mounts[idx].decListeners()
 		i.decListeners()
 	}
 	t := time.Now()
 	elapsed := t.Sub(start)
-	i.writeAccessLog(i.getHost(r.RemoteAddr), start, r.Method+" "+r.RequestURI+" "+r.Proto, *bytessended, r.Referer(), r.UserAgent(), int(elapsed.Seconds()))
+	i.writeAccessLog(i.getHost(r.RemoteAddr), start, r.Method+" "+r.RequestURI+" "+r.Proto, *bytesSend, r.Referer(), r.UserAgent(), int(elapsed.Seconds()))
 }
 
-func (i *IceServer) getHost(addr string) string {
+func (i *Server) getHost(addr string) string {
 	idx := strings.Index(addr, ":")
 	if idx == -1 {
 		return addr
@@ -47,7 +43,7 @@ func (i *IceServer) getHost(addr string) string {
 	return addr[:idx]
 }
 
-func (i *IceServer) logHeaders(w http.ResponseWriter, r *http.Request) {
+func (i *Server) logHeaders(w http.ResponseWriter, r *http.Request) {
 	request := r.Method + " " + r.RequestURI + " " + r.Proto + "\n"
 	for name, headers := range r.Header {
 		name = strings.ToLower(name)
@@ -55,24 +51,24 @@ func (i *IceServer) logHeaders(w http.ResponseWriter, r *http.Request) {
 			request += fmt.Sprintf("%v: %v\n", name, h)
 		}
 	}
-	i.printError(4, "\n"+request)
+	i.logger.Error(4, "\n"+request)
 }
 
 /*
 	openMount
     Decide what to do, according to HTTP method
 */
-func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
+func (i *Server) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 	if r.Method == "SOURCE" || r.Method == "PUT" {
 		if !i.checkSources() {
-			i.printError(1, "Number of sources exceeded")
+			i.logger.Error(1, "Number of sources exceeded")
 			http.Error(w, "Number of sources exceeded", 403)
 			return
 		}
 		i.writeMount(idx, w, r)
 	} else {
 		if !i.checkListeners() {
-			i.printError(1, "Number of listeners exceeded")
+			i.logger.Error(1, "Number of listeners exceeded")
 			http.Error(w, "Number of listeners exceeded", 403)
 			return
 		}
@@ -84,12 +80,12 @@ func (i *IceServer) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (i *IceServer) closeAndUnlock(pack *BufElement, err error) {
+func (i *Server) closeAndUnlock(pack *BufElement, err error) {
 	if te, ok := err.(net.Error); ok && te.Timeout() {
 		log.Println("Write timeout " + te.Error())
-		i.printError(1, "Write timeout")
+		i.logger.Error(1, "Write timeout")
 	} else {
-		i.printError(1, err.Error())
+		i.logger.Error(1, err.Error())
 	}
 	pack.UnLock()
 }
@@ -98,18 +94,18 @@ func (i *IceServer) closeAndUnlock(pack *BufElement, err error) {
 	readMount
 	Send stream from requested mount to client
 */
-func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *http.Request) {
+func (i *Server) readMount(idx int, icyMeta bool, w http.ResponseWriter, r *http.Request) {
 	var mount *Mount
 	var meta []byte
 	var err error
 	var beginIteration time.Time
 	var pack, nextpack *BufElement
 
-	bytessended := 0
+	bytesSended := 0
 	writed := 0
 	idle := 0
-	idleTimeOut := i.Props.Limits.EmptyBufferIdleTimeOut * 1000
-	writeTimeOut := time.Second * time.Duration(i.Props.Limits.WriteTimeOut)
+	idleTimeOut := i.Options.Limits.EmptyBufferIdleTimeOut * 1000
+	writeTimeOut := time.Second * time.Duration(i.Options.Limits.WriteTimeOut)
 	offset := 0
 	nometabytes := 0
 	partwrited := 0
@@ -120,7 +116,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 	hj, ok := w.(http.Hijacker)
 	if !ok {
-		i.printError(1, "webserver doesn't support hijacking")
+		i.logger.Error(1, "webserver doesn't support hijacking")
 		http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
 		return
 	}
@@ -133,22 +129,20 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	defer conn.Close()
 
 	start := time.Now()
-	mount = &i.Props.Mounts[idx]
+	mount = &i.Mounts[idx]
 
-	i.printError(3, "readMount "+mount.Name)
-	defer i.closeMount(idx, false, &bytessended, start, r)
+	i.logger.Error(3, "readMount "+mount.Options.Name)
+	defer i.closeMount(idx, false, &bytesSended, start, r)
 
 	//try to maximize unused buffer pages from beginning
-	pack = mount.buffer.Start(mount.BurstSize)
+	pack = mount.buffer.Start(mount.Options.BurstSize)
 
 	if pack == nil {
-		i.printError(1, "readMount Empty buffer")
+		i.logger.Error(1, "readMount Empty buffer")
 		return
 	}
 
-	//bufrw := bufio.NewWriterSize(conn, 1024*mount.BitRate/8)
-
-	mount.sayListenerHello(bufrw, icymeta)
+	mount.sayListenerHello(bufrw, icyMeta)
 
 	i.incListeners()
 	mount.incListeners()
@@ -163,7 +157,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 
 		n++
 		pack.Lock()
-		if icymeta {
+		if icyMeta {
 			meta, metalen = mount.getIcyMeta()
 
 			if nometabytes+pack.len+delta > mount.State.MetaInfo.MetaInt {
@@ -173,7 +167,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 				//log.Printf("   offset = %d - %d(nometabytes) - %d (delta) = %d", mount.State.MetaInfo.MetaInt, nometabytes, delta, offset)
 
 				if offset < 0 || offset >= pack.len {
-					i.printError(2, "Bad metainfo offset %d", offset)
+					i.logger.Error(2, "Bad metainfo offset %d", offset)
 					log.Printf("!!! Bad metainfo offset %d ***", offset)
 					offset = 0
 				}
@@ -216,10 +210,10 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 			break
 		}
 
-		bytessended += writed + nmtmp
+		bytesSended += writed + nmtmp
 
 		// send burst data whithout waiting
-		if bytessended >= mount.BurstSize {
+		if bytesSended >= mount.Options.BurstSize {
 			if time.Since(beginIteration) < time.Second {
 				time.Sleep(time.Second - time.Since(beginIteration))
 			}
@@ -230,7 +224,7 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 			time.Sleep(time.Millisecond * 250)
 			idle += 250
 			if idle >= idleTimeOut {
-				i.closeAndUnlock(pack, errors.New("Empty Buffer idle time is reached"))
+				i.closeAndUnlock(pack, errors.New("empty Buffer idle time is reached"))
 				break
 			}
 			nextpack = pack.Next()
@@ -246,16 +240,16 @@ func (i *IceServer) readMount(idx int, icymeta bool, w http.ResponseWriter, r *h
 	writeMount
 	Authenticate SOURCE and write stream from it to appropriate mount buffer
 */
-func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) {
+func (i *Server) writeMount(idx int, w http.ResponseWriter, r *http.Request) {
 	var mount *Mount
-	mount = &i.Props.Mounts[idx]
+	mount = &i.Mounts[idx]
 
 	if !mount.State.Started {
 		mount.mux.Lock()
 		err := mount.auth(w, r)
 		if err != nil {
 			mount.mux.Unlock()
-			i.printError(1, err.Error())
+			i.logger.Error(1, err.Error())
 			return
 		}
 		mount.writeICEHeaders(w, r)
@@ -263,23 +257,23 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		mount.State.StartedTime = time.Now()
 		mount.mux.Unlock()
 	} else {
-		i.printError(1, "SOURCE already connected")
+		i.logger.Error(1, "SOURCE already connected")
 		http.Error(w, "SOURCE already connected", 403)
 		return
 	}
 
-	bytessended := 0
+	bytesSended := 0
 	idle := 0
 	readed := 0
 	var err error
 	start := time.Now()
 
-	i.printError(3, "writeMount "+mount.Name)
-	defer i.closeMount(idx, true, &bytessended, start, r)
+	i.logger.Error(3, "writeMount "+mount.Options.Name)
+	defer i.closeMount(idx, true, &bytesSended, start, r)
 
 	hj, ok := w.(http.Hijacker)
 	if !ok {
-		i.printError(1, "webserver doesn't support hijacking")
+		i.logger.Error(1, "webserver doesn't support hijacking")
 		http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
 		return
 	}
@@ -291,11 +285,11 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 	}
 	defer conn.Close()
 
-	bufrw := bufio.NewReaderSize(conn, 1024*mount.BitRate/8)
+	bufrw := bufio.NewReaderSize(conn, 1024*mount.Options.BitRate/8)
 
 	i.incSources()
 	// max bytes per second according to bitrate
-	buff := make([]byte, mount.BitRate*1024/8)
+	buff := make([]byte, mount.Options.BitRate*1024/8)
 
 	for {
 		//check, if server has to be stopped
@@ -307,19 +301,19 @@ func (i *IceServer) writeMount(idx int, w http.ResponseWriter, r *http.Request) 
 		if err != nil {
 			if err == io.EOF {
 				idle++
-				if idle >= i.Props.Limits.SourceIdleTimeOut {
-					i.printError(1, "Source idle time is reached")
+				if idle >= i.Options.Limits.SourceIdleTimeOut {
+					i.logger.Error(1, "Source idle time is reached")
 					break
 				}
 			}
-			i.printError(3, err.Error())
+			i.logger.Error(3, err.Error())
 		} else {
 			idle = 0
 		}
 		// append to the buffer's queue based on actual readed bytes
 		mount.buffer.Append(buff, readed)
-		bytessended += readed
-		i.printError(4, "writeMount "+strconv.Itoa(readed)+"")
+		bytesSended += readed
+		i.logger.Error(4, "writeMount "+strconv.Itoa(readed)+"")
 
 		if mount.dumpFile != nil {
 			mount.dumpFile.Write(mount.buffer.Last().buffer)
