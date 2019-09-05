@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"path"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/ssetin/PenguinCast/src/log"
 	"github.com/ssetin/PenguinCast/src/pool"
 
+	"github.com/gorilla/mux"
 	"github.com/ssetin/PenguinCast/src/stat"
 )
 
@@ -64,8 +64,7 @@ func NewServer() (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	srv.logger, err = log.NewLogger(srv.Options.Logging.Loglevel, srv.Options.Paths.Log)
+	srv.logger, err = log.NewLogger(srv.Options.Logging.LogLevel, srv.Options.Paths.Log)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +76,8 @@ func NewServer() (*Server, error) {
 	srv.logger.Log("%s %s", srv.serverName, srv.version)
 
 	srv.srv = &http.Server{
-		Addr: ":" + strconv.Itoa(srv.Options.Socket.Port),
+		Addr:    ":" + strconv.Itoa(srv.Options.Socket.Port),
+		Handler: srv.configureRouter(),
 	}
 
 	if srv.Options.Logging.UseStat {
@@ -86,6 +86,22 @@ func NewServer() (*Server, error) {
 	}
 
 	return srv, nil
+}
+
+func (i *Server) configureRouter() *mux.Router {
+	r := mux.NewRouter()
+	for _, mnt := range i.Options.Mounts {
+		r.HandleFunc("/"+mnt.Name, i.writeMount).Methods("SOURCE", "PUT")
+		r.HandleFunc("/"+mnt.Name, i.readMount).Methods("GET")
+	}
+
+	r.HandleFunc("/info", i.infoPage).Methods("GET")
+	r.HandleFunc("/info.json", i.jsonPage).Methods("GET")
+	r.HandleFunc("/monitor", i.monitorPage).Methods("GET")
+	r.NotFoundHandler = http.HandlerFunc(i.notFoundPage)
+	r.PathPrefix("/").Handler(http.FileServer(http.Dir(i.Options.Paths.Web)))
+
+	return r
 }
 
 func (i *Server) initMounts() error {
@@ -180,8 +196,8 @@ func (i *Server) checkIsCommand(page string, r *http.Request) int {
 }
 
 // handler general http handler
-func (i *Server) handler(w http.ResponseWriter, r *http.Request) {
-	if i.Options.Logging.Loglevel == 4 {
+/*func (i *Server) handler(w http.ResponseWriter, r *http.Request) {
+	if i.Options.Logging.LogLevel == 4 {
 		i.logHeaders(w, r)
 	}
 
@@ -206,7 +222,7 @@ func (i *Server) handler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.ServeFile(w, r, page)
 	}
-}
+}*/
 
 /*
 	runCommand
@@ -242,7 +258,7 @@ func (i *Server) Start() {
 		})
 	}
 
-	http.HandleFunc("/", i.handler)
+	//http.HandleFunc("/", i.handler)
 
 	go func() {
 		i.mux.Lock()

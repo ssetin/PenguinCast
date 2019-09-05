@@ -57,7 +57,7 @@ func (i *Server) logHeaders(w http.ResponseWriter, r *http.Request) {
 	openMount
     Decide what to do, according to HTTP method
 */
-func (i *Server) openMount(idx int, w http.ResponseWriter, r *http.Request) {
+/*func (i *Server) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 	if r.Method == "SOURCE" || r.Method == "PUT" {
 		if !i.checkSources() {
 			i.logger.Error("Number of sources exceeded")
@@ -77,7 +77,7 @@ func (i *Server) openMount(idx int, w http.ResponseWriter, r *http.Request) {
 		}
 		i.readMount(idx, im, w, r)
 	}
-}
+}*/
 
 func (i *Server) closeAndUnlock(pack *bufElement, err error) {
 	if te, ok := err.(net.Error); ok && te.Timeout() {
@@ -93,7 +93,10 @@ func (i *Server) closeAndUnlock(pack *bufElement, err error) {
 	readMount
 	Send stream from requested mount to client
 */
-func (i *Server) readMount(idx int, icyMeta bool, w http.ResponseWriter, r *http.Request) {
+func (i *Server) readMount(w http.ResponseWriter, r *http.Request) {
+	idx := 1
+	var icyMeta bool
+
 	var mount *mount
 	var meta []byte
 	var err error
@@ -240,7 +243,8 @@ OuterLoop:
 	writeMount
 	Authenticate SOURCE and write stream from it to appropriate mount buffer
 */
-func (i *Server) writeMount(idx int, w http.ResponseWriter, r *http.Request) {
+func (i *Server) writeMount(w http.ResponseWriter, r *http.Request) {
+	idx := 1
 	mount := &i.Options.Mounts[idx]
 
 	if !mount.State.Started {
@@ -272,8 +276,8 @@ func (i *Server) writeMount(idx int, w http.ResponseWriter, r *http.Request) {
 
 	hj, ok := w.(http.Hijacker)
 	if !ok {
-		i.logger.Error("webserver doesn't support hijacking")
-		http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
+		i.logger.Error("webServer doesn't support hijacking")
+		http.Error(w, "webServer doesn't support hijacking", http.StatusInternalServerError)
 		return
 	}
 

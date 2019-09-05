@@ -4,25 +4,42 @@
 package ice
 
 import (
-	"errors"
 	"html/template"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"path"
-	"path/filepath"
 )
 
-func (i *Server) setNotFound(w http.ResponseWriter, r *http.Request) {
+func (i *Server) loadPage(filename string) ([]byte, error) {
+	body, err := ioutil.ReadFile(filename)
+	if err != nil {
+		i.logger.Error(err.Error())
+		return nil, err
+	}
+	return body, nil
+}
+
+func (i *Server) notFoundPage(w http.ResponseWriter, r *http.Request) {
 	f, _ := i.loadPage(i.Options.Paths.Web + "404.html")
-	w.WriteHeader(404)
-	w.Write(f)
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = w.Write(f)
 }
 
 func (i *Server) setInternal(w http.ResponseWriter, r *http.Request) {
 	f, _ := i.loadPage(i.Options.Paths.Web + "500.html")
-	w.WriteHeader(500)
+	w.WriteHeader(http.StatusInternalServerError)
 	w.Write(f)
+}
+
+func (i *Server) infoPage(w http.ResponseWriter, r *http.Request) {
+	i.renderPage(w, r, "templates/info.gohtml")
+}
+
+func (i *Server) jsonPage(w http.ResponseWriter, r *http.Request) {
+	i.renderPage(w, r, "templates/json.gohtml")
+}
+
+func (i *Server) monitorPage(w http.ResponseWriter, r *http.Request) {
+	i.renderPage(w, r, "templates/monitor.gohtml")
 }
 
 func (i *Server) renderPage(w http.ResponseWriter, r *http.Request, tplName string) {
@@ -40,19 +57,11 @@ func (i *Server) renderPage(w http.ResponseWriter, r *http.Request, tplName stri
 	}
 }
 
-func (i *Server) loadPage(filename string) ([]byte, error) {
-	body, err := ioutil.ReadFile(filename)
-	if err != nil {
-		i.logger.Error(err.Error())
-		return nil, err
-	}
-	return body, nil
-}
-
 /*
 	checkPage - return request object
 	filename, mount index, command index or error
 */
+/*
 func (i *Server) checkPage(w http.ResponseWriter, r *http.Request) (string, int, int, error) {
 	docName := path.Base(r.URL.Path)
 
@@ -85,3 +94,4 @@ func (i *Server) checkPage(w http.ResponseWriter, r *http.Request) (string, int,
 
 	return filename, -1, -1, nil
 }
+*/

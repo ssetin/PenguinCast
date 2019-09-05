@@ -37,7 +37,7 @@ type options struct {
 	} `yaml:"Paths"`
 
 	Logging struct {
-		Loglevel        log.LogsLevel `yaml:"Loglevel"`
+		LogLevel        log.LogsLevel `yaml:"LogLevel"`
 		LogSize         int           `yaml:"LogSize"`
 		UseMonitor      bool          `yaml:"UseMonitor"`
 		MonitorInterval int           `yaml:"MonitorInterval"`

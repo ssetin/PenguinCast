@@ -38,7 +38,7 @@
 					SizeBytes.textContent = Math.floor(msg.Mounts[idx].Buff.SizeBytes/1024);
 					var Graph = document.getElementById(msg.Mounts[idx].Name+".Graph");
 					Graph.innerHTML = drawBuffer(msg.Mounts[idx].Buff.Graph);
-					//{{ if .Props.Logging.UseStat }}
+					//{{ if .Options.Logging.UseStat }}
 					var CpuUse = document.getElementById("CPUUsage");
 					CpuUse.textContent = msg.CPUUsage;
 					var MemUse = document.getElementById("MemUsage");
@@ -96,7 +96,7 @@
 		CPUUsage, %: <span id="CPUUsage"></span><br/>
 		MemUsage, KB: <span id="MemUsage"></span><br/>
 		{{ end }}
-		admin: <a href="mailto:{{.Options.Admin}}">{{.Props.Admin}}</a>, location: {{.Options.Location}}<br/>
+		admin: <a href="mailto:{{.Options.Admin}}">{{.Options.Admin}}</a>, location: {{.Options.Location}}<br/>
 	</div>
 	</body>
 </html>
