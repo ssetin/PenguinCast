@@ -10,10 +10,10 @@ import (
 	"time"
 
 	iceclient "github.com/ssetin/PenguinCast/src/client"
-	iceserver "github.com/ssetin/PenguinCast/src/server"
+	"github.com/ssetin/PenguinCast/src/ice"
 )
 
-var IcySrv iceserver.IceServer
+var server *ice.Server
 
 // ================================== Setup ========================================
 const (
@@ -36,17 +36,17 @@ func init() {
 }
 
 func startServer() {
-	err := IcySrv.Init()
+	server, err := ice.NewServer()
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
-	IcySrv.Start()
+	server.Start()
 }
 func TestMain(m *testing.M) {
 	runTests := m.Run()
-	if runServer {
-		IcySrv.Close()
+	if server != nil {
+		server.Close()
 	}
 	os.Exit(runTests)
 }

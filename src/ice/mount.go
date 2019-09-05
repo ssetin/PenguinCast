@@ -19,8 +19,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ssetin/PenguinCast/src/config"
-
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/transform"
 )
@@ -36,14 +34,26 @@ type mountInfo struct {
 	Name      string
 	Listeners int32
 	UpTime    string
-	Buff      BufferInfo
+	Buff      bufferInfo
 }
 
-// Mount ...
-type Mount struct {
-	Options     config.MountOptions
+type mount struct {
+	Name         string `yaml:"Name"`
+	User         string `yaml:"User"`
+	Password     string `yaml:"Password"`
+	Description  string `yaml:"Description"`
+	BitRate      int    `yaml:"BitRate"`
+	Genre        string `yaml:"Genre"`
+	BurstSize    int    `yaml:"BurstSize"`
+	DumpFile     string `yaml:"DumpFile"`
+	MaxListeners int    `yaml:"MaxListeners"`
+
 	ContentType string
 	StreamURL   string
+
+	defaultStreamUrl string
+	serverName       string
+	serverVersion    string
 
 	State struct {
 		Started     bool
@@ -53,65 +63,64 @@ type Mount struct {
 	}
 
 	mux      sync.Mutex
-	buffer   BufferQueue
-	server   *Server
+	buffer   bufferQueue
 	dumpFile *os.File
 }
 
 //Init ...
-func (m *Mount) Init(srv *Server, opt config.MountOptions) error {
-	m.server = srv
-	m.Options = opt
+func (m *mount) Init(serverName, serverVersion, host string, port int, poolManager PoolManager) error {
+	m.defaultStreamUrl = fmt.Sprintf("http://%s:%d/%s", host, port, m.Name)
 	m.Clear()
-	m.State.MetaInfo.MetaInt = opt.BitRate * 1024 / 8 * 10
+	m.State.MetaInfo.MetaInt = m.BitRate * 1024 / 8 * 10
+	m.serverName = serverName
+	m.serverVersion = serverVersion
 
-	if opt.DumpFile > "" {
+	if m.DumpFile > "" {
 		var err error
-		m.dumpFile, err = os.OpenFile(opt.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
+		m.dumpFile, err = os.OpenFile(m.DumpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
 		if err != nil {
 			return err
 		}
 	}
 
-	pool := m.server.poolManager.Init(opt.BitRate * 1024 / 8)
-	m.buffer.Init(opt.BurstSize/(opt.BitRate*1024/8)+2, pool)
-
+	p := poolManager.Init(m.BitRate * 1024 / 8)
+	m.buffer.Init(m.BurstSize/(m.BitRate*1024/8)+2, p)
 	return nil
 }
 
 //Close ...
-func (m *Mount) Close() {
+func (m *mount) Close() {
 	if m.dumpFile != nil {
-		m.dumpFile.Close()
+		_ = m.dumpFile.Close()
 	}
 }
 
 //Clear ...
-func (m *Mount) Clear() {
+func (m *mount) Clear() {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	m.State.Started = false
 	m.State.StartedTime = time.Time{}
 	m.zeroListeners()
 	m.State.MetaInfo.StreamTitle = ""
-	m.StreamURL = "http://" + m.server.Options.Host + ":" + strconv.Itoa(m.server.Options.Socket.Port) + "/" + m.Options.Name
+	m.StreamURL = m.defaultStreamUrl
 }
 
-func (m *Mount) incListeners() {
+func (m *mount) incListeners() {
 	atomic.AddInt32(&m.State.Listeners, 1)
 }
 
-func (m *Mount) decListeners() {
+func (m *mount) decListeners() {
 	if atomic.LoadInt32(&m.State.Listeners) > 0 {
 		atomic.AddInt32(&m.State.Listeners, -1)
 	}
 }
 
-func (m *Mount) zeroListeners() {
+func (m *mount) zeroListeners() {
 	atomic.StoreInt32(&m.State.Listeners, 0)
 }
 
-func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
+func (m *mount) auth(w http.ResponseWriter, r *http.Request) error {
 	strAuth := r.Header.Get("authorization")
 
 	if strAuth == "" {
@@ -137,7 +146,7 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 		return errors.New("not authorized")
 	}
 
-	if m.Options.Password != pair[1] && m.Options.User != pair[0] {
+	if m.Password != pair[1] && m.User != pair[0] {
 		http.Error(w, "Not authorized", 401)
 		return errors.New("wrong user or password")
 	}
@@ -147,7 +156,7 @@ func (m *Mount) auth(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (m *Mount) getParams(paramStr string) map[string]string {
+func (m *mount) getParams(paramStr string) map[string]string {
 	var rex = regexp.MustCompile("(\\w+)=(\\w+)")
 	data := rex.FindAllStringSubmatch(paramStr, -1)
 	params := make(map[string]string)
@@ -159,38 +168,39 @@ func (m *Mount) getParams(paramStr string) map[string]string {
 	return params
 }
 
-func (m *Mount) sayListenerHello(w *bufio.ReadWriter, icyMeta bool) {
-	w.WriteString("HTTP/1.0 200 OK\r\n")
-	w.WriteString("Server: ")
-	w.WriteString(m.server.serverName)
-	w.WriteString(" ")
-	w.WriteString(m.server.version)
-	w.WriteString("\r\nContent-Type: ")
-	w.WriteString(m.ContentType)
-	w.WriteString("\r\nConnection: Keep-Alive\r\n")
-	w.WriteString("X-Audiocast-Bitrate: ")
-	w.WriteString(strconv.Itoa(m.Options.BitRate))
-	w.WriteString("\r\nX-Audiocast-Name: ")
-	w.WriteString(m.Options.Name)
-	w.WriteString("\r\nX-Audiocast-Genre: ")
-	w.WriteString(m.Options.Genre)
-	w.WriteString("\r\nX-Audiocast-Url: ")
-	w.WriteString(m.StreamURL)
-	w.WriteString("\r\nX-Audiocast-Public: 0\r\n")
-	w.WriteString("X-Audiocast-Description: ")
-	w.WriteString(m.Options.Description)
-	w.WriteString("\r\n")
+func (m *mount) sayHello(w *bufio.ReadWriter, icyMeta bool) {
+	_, _ = w.WriteString("HTTP/1.0 200 OK\r\n")
+	_, _ = w.WriteString("Server: ")
+	_, _ = w.WriteString(m.serverName)
+	_, _ = w.WriteString(" ")
+	_, _ = w.WriteString(m.serverVersion)
+	_, _ = w.WriteString("\r\n")
+	_, _ = w.WriteString("Content-Type: ")
+	_, _ = w.WriteString(m.ContentType)
+	_, _ = w.WriteString("\r\nConnection: Keep-Alive\r\n")
+	_, _ = w.WriteString("X-Audiocast-Bitrate: ")
+	_, _ = w.WriteString(strconv.Itoa(m.BitRate))
+	_, _ = w.WriteString("\r\nX-Audiocast-Name: ")
+	_, _ = w.WriteString(m.Name)
+	_, _ = w.WriteString("\r\nX-Audiocast-Genre: ")
+	_, _ = w.WriteString(m.Genre)
+	_, _ = w.WriteString("\r\nX-Audiocast-Url: ")
+	_, _ = w.WriteString(m.StreamURL)
+	_, _ = w.WriteString("\r\nX-Audiocast-Public: 0\r\n")
+	_, _ = w.WriteString("X-Audiocast-Description: ")
+	_, _ = w.WriteString(m.Description)
+	_, _ = w.WriteString("\r\n")
 	if icyMeta {
-		w.WriteString("Icy-Metaint: ")
-		w.WriteString(strconv.Itoa(m.State.MetaInfo.MetaInt))
-		w.WriteString("\r\n")
+		_, _ = w.WriteString("Icy-Metaint: ")
+		_, _ = w.WriteString(strconv.Itoa(m.State.MetaInfo.MetaInt))
+		_, _ = w.WriteString("\r\n")
 	}
-	w.WriteString("\r\n")
+	_, _ = w.WriteString("\r\n")
 	w.Flush()
 }
 
-func (m *Mount) saySourceHello(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Server", m.server.serverName+"/"+m.server.version)
+func (m *mount) saySourceHello(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Server", m.serverName+"/"+m.serverVersion)
 	w.Header().Set("Connection", "Keep-Alive")
 	w.Header().Set("Allow", "GET, SOURCE")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -203,7 +213,7 @@ func (m *Mount) saySourceHello(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 }
 
-func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
+func (m *mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
 	var bitRateStr string
 	bitRateStr = r.Header.Get("ice-bitrate")
 	if bitRateStr == "" {
@@ -216,17 +226,17 @@ func (m *Mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
 
 	bRate, err := strconv.Atoi(bitRateStr)
 	if err != nil {
-		m.Options.BitRate = 0
+		m.BitRate = 0
 	} else {
-		m.Options.BitRate = bRate
+		m.BitRate = bRate
 	}
 
-	m.Options.Genre = r.Header.Get("ice-genre")
+	m.Genre = r.Header.Get("ice-genre")
 	m.ContentType = r.Header.Get("content-type")
-	m.Options.Description = r.Header.Get("ice-description")
+	m.Description = r.Header.Get("ice-description")
 }
 
-func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
+func (m *mount) updateMeta(w http.ResponseWriter, r *http.Request) {
 	err := m.auth(w, r)
 	if err != nil {
 		return
@@ -253,7 +263,7 @@ func (m *Mount) updateMeta(w http.ResponseWriter, r *http.Request) {
 	if m.State.MetaInfo.StreamTitle > "" {
 		mStr = "StreamTitle='" + m.State.MetaInfo.StreamTitle + "';"
 	} else {
-		mStr += "StreamTitle='" + m.Options.Description + "';"
+		mStr += "StreamTitle='" + m.Description + "';"
 	}
 
 	metaSize = byte(math.Ceil(float64(len(mStr)) / 16.0))
@@ -277,11 +287,11 @@ func fmtDuration(d time.Duration) string {
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
 
-func (m *Mount) getMountsInfo() mountInfo {
+func (m *mount) getMountsInfo() mountInfo {
 	var t mountInfo
 	t.Listeners = atomic.LoadInt32(&m.State.Listeners)
 	m.mux.Lock()
-	t.Name = m.Options.Name
+	t.Name = m.Name
 	if m.State.Started {
 		t.UpTime = fmtDuration(time.Since(m.State.StartedTime))
 		t.Buff = m.buffer.Info()
@@ -291,7 +301,7 @@ func (m *Mount) getMountsInfo() mountInfo {
 }
 
 // icy style metadata
-func (m *Mount) getIcyMeta() ([]byte, int) {
+func (m *mount) getIcyMeta() ([]byte, int) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	return m.State.MetaInfo.meta, m.State.MetaInfo.metaSizeByte

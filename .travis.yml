@@ -4,10 +4,6 @@ go:
 - "1.13"
  
 before_script:
-- go get golang.org/x/tools/cmd/cover
-- go get -u github.com/mattn/goveralls
 
 script:
-- go test -v -race -covermode=atomic -coverprofile=cover.out ./src/relay2peer/ ./src/server/
-- goveralls -v -coverprofile=cover.out -service=travis-ci -repotoken $COVERALLS_TOKEN
 - go build -v

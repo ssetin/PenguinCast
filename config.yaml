@@ -20,10 +20,12 @@ Paths:
   Web: html/
 
 Logging:
-  LogLevel: 2
+  LogLevel: 4
   LogSize: 50000
   UseMonitor: true
+  MonitorInterval: 5
   UseStat: true
+  StatInterval: 5
 
 Mounts:
   - Name: RockRadio96

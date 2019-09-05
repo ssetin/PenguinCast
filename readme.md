@@ -4,45 +4,58 @@
 [![Build Status](https://travis-ci.org/ssetin/PenguinCast.svg?branch=master)](https://travis-ci.org/ssetin/PenguinCast)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ssetin/PenguinCast)](https://goreportcard.com/report/github.com/ssetin/PenguinCast)
 
-Icecast compatible streaming audio server - server part of your internet radio station.
+IceCast compatible streaming audio server - server part of your internet radio station.
 
 ## Capabilities
 * Receiving stream from Source and sending it to Clients
-* Operating with shoutcast metadata
+* Operating with ShoutCast metadata
 * Collecting and saving listening statistics to access.log file
-* Html and json interface for accessing server status (__http://host:port/info.html__ and __http://host:port/info.json__)
+* Html and json endpoints for accessing server status (__http://host:port/info.html__ and __http://host:port/info.json__)
 * Real time server state monitoring (__http://host:port/monitor.html__)
-* Relay from peer to peer (under development)
+* Configuring by YAML
 
 ## Configuring
-Configuration parameters are stored in config.json.
+Configuration parameters are stored in config.yaml.
 
-```json
-{
-    "Name": "Rollstation radio",
-    "Admin": "admin@site.com",
-    "Location": "Saint Petersburg",
-    "Host": "127.0.0.1",
-    "Socket": { "Port": 8008},
-    "Limits": {
-        "Clients": 30, "Sources": 5, 
-        "SourceIdleTimeOut": 5, "EmptyBufferIdleTimeOut": 5, "WriteTimeOut": 10
-    },
-    "Auth": {"AdminPassword": "admin"},
-    "Paths": {"Log": "log/", "Web":"html/"},
-    "Logging": {
-        "Loglevel": 4,
-        "Logsize": 50000,
-        "UseMonitor": true,
-        "UseStat": true},
-    "Mounts": [
-        {
-            "Name": "RockRadio96", "User":"admin", "Password": "admin", "Genre":"Rock", 
-            "Description": "Rock radio station, Saint Petersburg", "BitRate":96, 
-            "BurstSize": 65536, "DumpFile": "rock96.mp3"
-        }
-    ]
-}
+```yaml
+Name: Rollstation radio
+Admin: admin@site.com
+Location: Saint Petersburg
+Host: 127.0.0.1
+Socket:
+  Port: 8008
+
+Limits:
+  Clients: 100000
+  Sources: 5
+  SourceIdleTimeOut: 10
+  EmptyBufferIdleTimeOut: 5
+  WriteTimeOut: 10
+
+Auth:
+  AdminPassword: admin
+
+Paths:
+  Log: log/
+  Web: html/
+
+Logging:
+  LogLevel: 2
+  LogSize: 50000
+  UseMonitor: true
+  MonitorInterval: 5
+  UseStat: true
+  StatInterval: 5
+
+Mounts:
+  - Name: RockRadio96
+    User: admin
+    Password: admin
+    Genre: Rock
+    Description: Rock radio station, Saint Petersburg
+    BitRate: 96
+    BurstSize: 65535
+    DumpFile: ''
 ```
 
 #### Socket
@@ -72,7 +85,9 @@ Configuration parameters are stored in config.json.
     - 3 - Info
     - 4 - Debug
 - UseMonitor - activate online monitoring of server state
+- MonitorInterval - monitor updating interval, sec
 - UseStat - collect and save listeners count, cpu and memory usage to file log/stat.log
+- StatInterval - statistics collection interval, sec
 
 
 ## Load testing

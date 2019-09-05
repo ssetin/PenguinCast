@@ -7,29 +7,31 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 type LogsLevel int
 
 const (
-	LevelError   = 1
-	LevelWarning = 2
-	LevelInfo    = 3
-	LevelDebug   = 4
+	levelError   = 1
+	levelWarning = 2
+	levelInfo    = 3
+	levelDebug   = 4
 )
 
-type IceLogger struct {
+type iceLogger struct {
 	level     LogsLevel
 	logError  *log.Logger
 	logAccess *log.Logger
+	logStat   *log.Logger
 
 	logErrorFile  *os.File
 	logAccessFile *os.File
 	statFile      *os.File
 }
 
-func NewLogger(level LogsLevel, logsPath string) (*IceLogger, error) {
-	newLogger := &IceLogger{
+func NewLogger(level LogsLevel, logsPath string) (*iceLogger, error) {
+	newLogger := &iceLogger{
 		level: level,
 	}
 
@@ -54,6 +56,7 @@ func NewLogger(level LogsLevel, logsPath string) (*IceLogger, error) {
 			return nil, err
 		}
 		_, _ = fmt.Fprintln(newLogger.statFile, "#Time	#Listeners	#CpuUsage	#MemUsage")
+		newLogger.logStat = log.New(newLogger.statFile, "", log.Ldate|log.Ltime)
 	}
 
 	newLogger.logError = log.New(newLogger.logErrorFile, "", log.Ldate|log.Ltime)
@@ -62,37 +65,53 @@ func NewLogger(level LogsLevel, logsPath string) (*IceLogger, error) {
 	return newLogger, nil
 }
 
-func (l *IceLogger) Error(errorLevel LogsLevel, format string, v ...interface{}) {
+func (l *iceLogger) output(errorLevel LogsLevel, format string, v ...interface{}) {
+	out := strings.Builder{}
 	if errorLevel <= l.level {
-		var mark string
 		switch errorLevel {
 		case 1:
-			mark = "Error: "
+			out.WriteString("E: ")
 		case 2:
-			mark = "Warn: "
+			out.WriteString("W: ")
 		case 3:
-			mark = "Info: "
+			out.WriteString("I: ")
 		case 4:
-			mark = "Debug: "
+			out.WriteString("D: ")
 		}
-		l.logError.Print(mark)
-		l.logError.Printf(format, v...)
+		out.WriteString(format)
+		l.logError.Printf(out.String(), v...)
 	}
 }
 
-func (l *IceLogger) Access(format string, v ...interface{}) {
+func (l *iceLogger) Error(format string, v ...interface{}) {
+	l.output(levelError, format, v)
+}
+
+func (l *iceLogger) Debug(format string, v ...interface{}) {
+	l.output(levelDebug, format, v)
+}
+
+func (l *iceLogger) Warning(format string, v ...interface{}) {
+	l.output(levelWarning, format, v)
+}
+
+func (l *iceLogger) Info(format string, v ...interface{}) {
+	l.output(levelInfo, format, v)
+}
+
+func (l *iceLogger) Access(format string, v ...interface{}) {
 	l.logAccess.Printf(format, v...)
 }
 
-func (l *IceLogger) Log(format string, v ...interface{}) {
+func (l *iceLogger) Log(format string, v ...interface{}) {
 	log.Printf(format, v...)
 }
 
-func (l *IceLogger) Stat(format string, v ...interface{}) {
-	_, _ = fmt.Fprintf(l.statFile, format, v)
+func (l *iceLogger) Stat(format string, v ...interface{}) {
+	l.logStat.Printf(format, v...)
 }
 
-func (l *IceLogger) Close() {
+func (l *iceLogger) Close() {
 	_ = l.logErrorFile.Close()
 	_ = l.logAccessFile.Close()
 	if l.statFile != nil {

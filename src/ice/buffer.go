@@ -9,27 +9,27 @@ import (
 )
 
 //BufElement - kind of buffer page
-type BufElement struct {
+type bufElement struct {
 	locked int32
 	len    int
 	buffer []byte
-	next   *BufElement
-	prev   *BufElement
+	next   *bufElement
+	prev   *bufElement
 	mux    sync.Mutex
 }
 
 // BufferQueue - queue, which stores stream fragments from SOURCE
-type BufferQueue struct {
+type bufferQueue struct {
 	mux           sync.Mutex
 	size          int
 	maxBufferSize int
 	minBufferSize int
-	first, last   *BufElement
+	first, last   *bufElement
 	pool          *sync.Pool
 }
 
 // BufferInfo - struct for monitoring
-type BufferInfo struct {
+type bufferInfo struct {
 	Size      int
 	SizeBytes int
 	Graph     string
@@ -37,7 +37,7 @@ type BufferInfo struct {
 }
 
 // Reset ...
-func (q *BufElement) Reset(pool *sync.Pool) {
+func (q *bufElement) Reset(pool *sync.Pool) {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	q.len = 0
@@ -56,24 +56,24 @@ func (q *BufElement) Reset(pool *sync.Pool) {
 }
 
 // Next - getting next element
-func (q *BufElement) Next() *BufElement {
+func (q *bufElement) Next() *bufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	return q.next
 }
 
 // Lock - mark element as used by listener
-func (q *BufElement) Lock() {
+func (q *bufElement) Lock() {
 	atomic.AddInt32(&q.locked, 1)
 }
 
 // UnLock -  mark element as unused by listener
-func (q *BufElement) UnLock() {
+func (q *bufElement) UnLock() {
 	atomic.AddInt32(&q.locked, -1)
 }
 
 // IsLocked (logical lock, mean it's in use)
-func (q *BufElement) IsLocked() bool {
+func (q *bufElement) IsLocked() bool {
 	if atomic.LoadInt32(&q.locked) <= 0 {
 		return false
 	}
@@ -83,7 +83,7 @@ func (q *BufElement) IsLocked() bool {
 //***************************************
 
 // Init - initiates buffer queue
-func (q *BufferQueue) Init(minSize int, pool *sync.Pool) {
+func (q *bufferQueue) Init(minSize int, pool *sync.Pool) {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	q.size = 0
@@ -95,8 +95,8 @@ func (q *BufferQueue) Init(minSize int, pool *sync.Pool) {
 }
 
 // NewBufElement - returns new buffer element (page)
-func (q *BufferQueue) newBufElement(buffer []byte, readed int) *BufElement {
-	t := &BufElement{}
+func (q *bufferQueue) newBufElement(buffer []byte, readed int) *bufElement {
+	t := &bufElement{}
 
 	if q.pool == nil {
 		return nil
@@ -111,16 +111,16 @@ func (q *BufferQueue) newBufElement(buffer []byte, readed int) *BufElement {
 }
 
 // Size - returns buffer queue size
-func (q *BufferQueue) Size() int {
+func (q *bufferQueue) Size() int {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	return q.size
 }
 
 // Info - returns buffer state
-func (q *BufferQueue) Info() BufferInfo {
-	var result BufferInfo
-	var t *BufElement
+func (q *bufferQueue) Info() bufferInfo {
+	var result bufferInfo
+	var t *bufElement
 	str := ""
 
 	q.mux.Lock()
@@ -150,26 +150,26 @@ func (q *BufferQueue) Info() BufferInfo {
 }
 
 // First - returns the first element in buffer queue
-func (q *BufferQueue) First() *BufElement {
+func (q *bufferQueue) First() *bufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	return q.first
 }
 
 // Last - returns the last element in buffer queue
-func (q *BufferQueue) Last() *BufElement {
+func (q *bufferQueue) Last() *bufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 	return q.last
 }
 
 // Start - returns the element to start with
-func (q *BufferQueue) Start(burstSize int) *BufElement {
+func (q *bufferQueue) Start(burstSize int) *bufElement {
 	q.mux.Lock()
 	defer q.mux.Unlock()
 
 	burst := 0
-	var t *BufElement
+	var t *bufElement
 	t = q.last
 	if t == nil {
 		return nil
@@ -188,14 +188,14 @@ func (q *BufferQueue) Start(burstSize int) *BufElement {
 
 // checkAndTruncate - check if the max buffer size is reached and try to truncate it
 // taking into account pages, which still in use
-func (q *BufferQueue) checkAndTruncate() {
+func (q *bufferQueue) checkAndTruncate() {
 	if q.Size() < q.maxBufferSize {
 		return
 	}
 
 	q.mux.Lock()
 	defer q.mux.Unlock()
-	var t *BufElement
+	var t *bufElement
 
 	for {
 		t = q.first
@@ -221,8 +221,8 @@ func (q *BufferQueue) checkAndTruncate() {
 }
 
 // Append - appends new page to the end of the buffer queue
-func (q *BufferQueue) Append(buffer []byte, readed int) {
-	t := q.newBufElement(buffer, readed)
+func (q *bufferQueue) Append(buffer []byte, read int) {
+	t := q.newBufElement(buffer, read)
 	if t == nil {
 		return
 	}

@@ -1,24 +1,14 @@
-package config
+package ice
 
 import (
 	"io/ioutil"
 
+	"github.com/ssetin/PenguinCast/src/log"
+
 	"gopkg.in/yaml.v3"
 )
 
-type MountOptions struct {
-	Name         string `yaml:"Name"`
-	User         string `yaml:"User"`
-	Password     string `yaml:"Password"`
-	Description  string `yaml:"Description"`
-	BitRate      int    `yaml:"BitRate"`
-	Genre        string `yaml:"Genre"`
-	BurstSize    int    `yaml:"BurstSize"`
-	DumpFile     string `yaml:"DumpFile"`
-	MaxListeners int    `yaml:"MaxListeners"`
-}
-
-type Options struct {
+type options struct {
 	Name     string `yaml:"Name"`
 	Admin    string `yaml:"Admin,omitempty"`
 	Location string `yaml:"Location,omitempty"`
@@ -47,16 +37,18 @@ type Options struct {
 	} `yaml:"Paths"`
 
 	Logging struct {
-		Loglevel   int  `yaml:"Loglevel"`
-		LogSize    int  `yaml:"LogSize"`
-		UseMonitor bool `yaml:"UseMonitor"`
-		UseStat    bool `yaml:"UseStat"`
+		Loglevel        log.LogsLevel `yaml:"Loglevel"`
+		LogSize         int           `yaml:"LogSize"`
+		UseMonitor      bool          `yaml:"UseMonitor"`
+		MonitorInterval int           `yaml:"MonitorInterval"`
+		UseStat         bool          `yaml:"UseStat"`
+		StatInterval    int           `yaml:"StatInterval"`
 	} `yaml:"Logging"`
 
-	Mounts []MountOptions `yaml:"Mounts"`
+	Mounts []mount `yaml:"Mounts"`
 }
 
-func (o *Options) Load() error {
+func (o *options) Load() error {
 	yamlFile, err := ioutil.ReadFile("config.yaml")
 	if err != nil {
 		return err

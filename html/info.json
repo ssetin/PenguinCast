@@ -1,8 +1,10 @@
 {
-    "Mounts": [{{range $index,$element := .Props.Mounts}}{{if $index}},{{end}}
+    "Mounts":
+    [{{range $index,$element := .Options.Mounts -}}
+        {{if $index}},{{end}}
     {
         "Name ": "{{.Name}}",
-        "Status": "{{.State.Status}}",
+        "Status": "{{if .State.Started}}Online{{else}}Offline{{end}}",
         "Started": "{{.State.Started}}",
         "Stream Description": "{{.Description}}",
         "Genre": "{{.Genre}}",
@@ -12,4 +14,5 @@
         "Stream URL": "{{.StreamURL}}",
         "Currently playing": "{{.State.MetaInfo.StreamTitle}}"
     }{{end}}
-]}
+    ],
+}

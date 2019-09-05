@@ -7,14 +7,13 @@ import (
 )
 
 func main() {
-	var IcySrv ice.Server
+	server, err := ice.NewServer()
 
-	err := IcySrv.Init()
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
-	defer IcySrv.Close()
+	defer server.Close()
 
-	IcySrv.Start()
+	server.Start()
 }

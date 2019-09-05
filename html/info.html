@@ -12,10 +12,10 @@
 		<h1 class="left mainheader">PenguinCast</h1>
 	</div><div class="clear"></div>
 		<div>
-			{{range .Mounts}}
+			{{range .Options.Mounts}}
 			<table class="greyGridTable">
 				<tr>
-					<th><h3>{{.Options.Name}}</h3></th>
+					<th><h3>{{.Name}}</h3></th>
 					<th></th>
 				</tr>
 				<tr>
@@ -28,11 +28,11 @@
 				</tr>				
 				<tr>
 					<td>Stream Description:</td>
-					<td>{{.Options.Description}}</td>
+					<td>{{.Description}}</td>
 				</tr>
 				<tr>
 					<td>Genre:</td>
-					<td>{{.Options.Genre}}</td>
+					<td>{{.Genre}}</td>
 				</tr>				
 				<tr>
 					<td>Content Type:</td>
@@ -40,7 +40,7 @@
 				</tr>
 				<tr>
 					<td>Bitrate:</td>
-					<td>{{.Options.BitRate}}</td>
+					<td>{{.BitRate}}</td>
 				</tr>
 				<tr>
 					<td>Listeners (current):</td>
@@ -63,8 +63,6 @@
 		{{ end }}
 		Started at {{.StartedTime.Format "Jan 02, 2006 15:04:05"}}<br/>
 		admin: <a href="mailto:{{.Options.Admin}}">{{.Options.Admin}}</a>, location: {{.Options.Location}}<br/>
-		No support, just take fun with radio<br/>
-		* inspired by the icecast
 	</div>
 	</body>
 </html>

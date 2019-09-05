@@ -25,16 +25,16 @@ func (i *Server) setInternal(w http.ResponseWriter, r *http.Request) {
 	w.Write(f)
 }
 
-func (i *Server) renderPage(w http.ResponseWriter, r *http.Request, tplname string) {
-	t, err := template.ParseFiles(tplname)
+func (i *Server) renderPage(w http.ResponseWriter, r *http.Request, tplName string) {
+	t, err := template.ParseFiles(tplName)
 	if err != nil {
-		i.logger.Error(1, err.Error())
+		i.logger.Error(err.Error())
 		i.setInternal(w, r)
 		return
 	}
 	err = t.Execute(w, i)
 	if err != nil {
-		i.logger.Error(1, err.Error())
+		i.logger.Error(err.Error())
 		i.setInternal(w, r)
 		return
 	}
@@ -43,7 +43,7 @@ func (i *Server) renderPage(w http.ResponseWriter, r *http.Request, tplname stri
 func (i *Server) loadPage(filename string) ([]byte, error) {
 	body, err := ioutil.ReadFile(filename)
 	if err != nil {
-		i.logger.Error(1, err.Error())
+		i.logger.Error(err.Error())
 		return nil, err
 	}
 	return body, nil
@@ -67,12 +67,12 @@ func (i *Server) checkPage(w http.ResponseWriter, r *http.Request) (string, int,
 	}
 
 	filename := filepath.Join(i.Options.Paths.Web, filepath.Clean(r.URL.Path))
-	i.logger.Error(4, "checkPage filename="+filename)
+	i.logger.Debug("checkPage filename=%s", filename)
 
 	info, err := os.Stat(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
-			i.logger.Error(1, err.Error())
+			i.logger.Error(err.Error())
 			i.setNotFound(w, r)
 			return "", -1, -1, err
 		}

@@ -4,7 +4,7 @@
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />	
 	<link rel="stylesheet" type="text/css" href="/style.css" />
 	<link rel="shortcut icon" type="image/x-icon" href="/img/penguin.png" />
-	<title>{{.Props.Name}} Monitor</title>
+	<title>{{.Options.Name}} Monitor</title>
 
 	<script type="text/javascript">
   		function drawBuffer(str){
@@ -47,7 +47,7 @@
 				}
 			}
 				
-			conn = new WebSocket("ws://{{.Props.Host}}:{{.Props.Socket.Port}}/updateMonitor");
+			conn = new WebSocket("ws://{{.Options.Host}}:{{.Options.Socket.Port}}/updateMonitor");
 			conn.onmessage = function (event) {
 				updateMonitor(JSON.parse(event.data));
 			};
@@ -57,7 +57,7 @@
 		<h1 class="left mainheader">PenguinCast Monitor</h1>
 	</div><div class="clear"></div>
 		<div id="monContainer">
-				{{range .Props.Mounts}}
+				{{range .Options.Mounts}}
 				<table class="greyGridTable">
 					<tr>
 						<th><h3>{{.Name}}</h3></th>
@@ -92,11 +92,11 @@
 		</div>
 	<div id="footer">
 		Started at {{.StartedTime.Format "Jan 02, 2006 15:04:05"}}<br/>
-		{{ if .Props.Logging.UseStat }}
+		{{ if .Options.Logging.UseStat }}
 		CPUUsage, %: <span id="CPUUsage"></span><br/>
 		MemUsage, KB: <span id="MemUsage"></span><br/>
 		{{ end }}
-		admin: <a href="mailto:{{.Props.Admin}}">{{.Props.Admin}}</a>, location: {{.Props.Location}}<br/>		
+		admin: <a href="mailto:{{.Options.Admin}}">{{.Props.Admin}}</a>, location: {{.Options.Location}}<br/>
 	</div>
 	</body>
 </html>

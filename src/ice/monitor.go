@@ -14,7 +14,7 @@ import (
 )
 
 //MonitorInfo ...
-type MonitorInfo struct {
+type monitorInfo struct {
 	Mounts   []mountInfo
 	CPUUsage float64
 	MemUsage int
@@ -29,15 +29,15 @@ var upGrader = websocket.Upgrader{
 }
 
 func (i *Server) processStats() {
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(time.Duration(i.Options.Logging.StatInterval) * time.Second)
 	for {
 		CPU, Memory, err := i.statReader.GetCPUAndMem()
 		if err != nil {
-			i.logger.Error(1, err.Error())
+			i.logger.Error(err.Error())
 			ticker.Stop()
 			break
 		}
-		i.logger.Stat(time.Now().Format("2006-01-02 15:04:05")+"\t%d\t%f\t%d\n", atomic.LoadInt32(&i.ListenersCount), CPU, Memory/1024)
+		i.logger.Stat("%d\t%f\t%d\n", atomic.LoadInt32(&i.ListenersCount), CPU, Memory/1024)
 		i.mux.Lock()
 		i.cpuUsage = math.Floor(CPU*100) / 100
 		i.memUsage = Memory / 1024
@@ -46,8 +46,8 @@ func (i *Server) processStats() {
 	}
 }
 
-func (i *Server) sendMonitorInfo(client *websocket.Conn) {
-	ticker := time.NewTicker(5 * time.Second)
+func (i *Server) sendMonitorInfo(interval int, client *websocket.Conn) {
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	for {
 		w, err := client.NextWriter(websocket.TextMessage)
 		if err != nil {
@@ -55,11 +55,11 @@ func (i *Server) sendMonitorInfo(client *websocket.Conn) {
 			break
 		}
 
-		monitorInfo := &MonitorInfo{}
+		monitorInfo := &monitorInfo{}
 		monitorInfo.Mounts = make([]mountInfo, 0, len(i.Options.Mounts))
 
-		for idx := range i.Mounts {
-			inf := i.Mounts[idx].getMountsInfo()
+		for idx := range i.Options.Mounts {
+			inf := i.Options.Mounts[idx].getMountsInfo()
 			monitorInfo.Mounts = append(monitorInfo.Mounts, inf)
 		}
 		i.mux.Lock()

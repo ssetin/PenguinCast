@@ -16,10 +16,8 @@ import (
 	"time"
 
 	"github.com/ssetin/PenguinCast/src/log"
-
-	"github.com/ssetin/PenguinCast/src/config"
-
 	"github.com/ssetin/PenguinCast/src/pool"
+
 	"github.com/ssetin/PenguinCast/src/stat"
 )
 
@@ -32,13 +30,11 @@ var (
 	vCommands = [...]string{"metadata"}
 )
 
-// Server ...
 type Server struct {
 	serverName string
 	version    string
 
-	Options config.Options
-	Mounts  []Mount
+	Options options
 
 	mux            sync.Mutex
 	Started        int32
@@ -52,54 +48,50 @@ type Server struct {
 	memUsage int
 
 	srv         *http.Server
-	poolManager pool.Manager
-	logger      *log.IceLogger
+	poolManager PoolManager
+	logger      Logger
 }
 
 // Init - Load params from config.json
-func (i *Server) Init() error {
-	var err error
+func NewServer() (*Server, error) {
+	srv := &Server{
+		serverName:  cServerName,
+		version:     cVersion,
+		poolManager: pool.NewPoolManager(),
+	}
 
-	i.serverName = cServerName
-	i.version = cVersion
-
-	i.ListenersCount = 0
-	i.SourcesCount = 0
-	i.Started = 0
-
-	err = i.Options.Load()
+	err := srv.Options.Load()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	i.logger, err = log.NewLogger(log.LogsLevel(i.Options.Logging.Loglevel), i.Options.Paths.Log)
+	srv.logger, err = log.NewLogger(srv.Options.Logging.Loglevel, srv.Options.Paths.Log)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	err = i.initMounts()
+	err = srv.initMounts()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	i.logger.Log("Init " + i.serverName + " " + i.version)
+	srv.logger.Log("%s %s", srv.serverName, srv.version)
 
-	i.srv = &http.Server{
-		Addr: ":" + strconv.Itoa(i.Options.Socket.Port),
+	srv.srv = &http.Server{
+		Addr: ":" + strconv.Itoa(srv.Options.Socket.Port),
 	}
 
-	if i.Options.Logging.UseStat {
-		i.statReader.Init()
-		go i.processStats()
+	if srv.Options.Logging.UseStat {
+		srv.statReader.Init()
+		go srv.processStats()
 	}
 
-	return nil
+	return srv, nil
 }
 
 func (i *Server) initMounts() error {
 	var err error
-	i.Mounts = make([]Mount, len(i.Options.Mounts))
-	for idx := range i.Mounts {
-		err = i.Mounts[idx].Init(i, i.Options.Mounts[idx])
+	for idx := range i.Options.Mounts {
+		err = i.Options.Mounts[idx].Init(i.serverName, i.version, i.Options.Host, i.Options.Socket.Port, i.poolManager)
 		if err != nil {
 			return err
 		}
@@ -146,14 +138,14 @@ func (i *Server) checkSources() bool {
 // Close - finish
 func (i *Server) Close() {
 	if err := i.srv.Shutdown(context.Background()); err != nil {
-		i.logger.Error(1, err.Error())
+		i.logger.Error(err.Error())
 		i.logger.Log("Error: %s\n", err.Error())
 	} else {
 		i.logger.Log("Stopped")
 	}
 
-	for idx := range i.Mounts {
-		i.Mounts[idx].Close()
+	for idx := range i.Options.Mounts {
+		i.Options.Mounts[idx].Close()
 	}
 
 	i.statReader.Close()
@@ -161,18 +153,18 @@ func (i *Server) Close() {
 }
 
 func (i *Server) checkIsMount(page string) int {
-	for idx := range i.Mounts {
-		if i.Mounts[idx].Options.Name == page {
+	for idx := range i.Options.Mounts {
+		if i.Options.Mounts[idx].Name == page {
 			return idx
 		}
 	}
 	return -1
 }
 
-func (i *Server) getMount(mountName string) *Mount {
-	for idx := range i.Mounts {
-		if i.Mounts[idx].Options.Name == mountName {
-			return &i.Mounts[idx]
+func (i *Server) getMount(mountName string) *mount {
+	for idx := range i.Options.Mounts {
+		if i.Options.Mounts[idx].Name == mountName {
+			return &i.Options.Mounts[idx]
 		}
 	}
 	return nil
@@ -195,7 +187,7 @@ func (i *Server) handler(w http.ResponseWriter, r *http.Request) {
 
 	page, mountIdx, cmdIdx, err := i.checkPage(w, r)
 	if err != nil {
-		i.logger.Error(1, err.Error())
+		i.logger.Error(err.Error())
 		return
 	}
 
@@ -222,10 +214,10 @@ func (i *Server) handler(w http.ResponseWriter, r *http.Request) {
 func (i *Server) runCommand(idx int, w http.ResponseWriter, r *http.Request) {
 	if idx == 0 {
 		mountName := path.Base(r.URL.Query().Get("mount"))
-		i.logger.Error(4, "runCommand 0 with "+mountName)
+		i.logger.Debug("runCommand 0 with %s", mountName)
 		mIdx := i.checkIsMount(mountName)
 		if mIdx >= 0 {
-			i.Mounts[mIdx].updateMeta(w, r)
+			i.Options.Mounts[mIdx].updateMeta(w, r)
 		}
 	}
 
@@ -246,7 +238,7 @@ func (i *Server) Start() {
 			if err != nil {
 				panic(err)
 			}
-			go i.sendMonitorInfo(ws)
+			go i.sendMonitorInfo(i.Options.Logging.MonitorInterval, ws)
 		})
 	}
 

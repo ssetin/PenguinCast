@@ -25,8 +25,8 @@ import (
 type ProcStats struct {
 	Utime     float64 // Amount of time that this process has been scheduled in user mode
 	Stime     float64 // Amount of time that this process has been scheduled in kernel mode
-	Cutime    float64 // Amount of time that this process's waited-for chil‐dren have been scheduled in user mode
-	Cstime    float64 // Amount of time that this process's waited-for chil‐dren have been scheduled in kernel mode
+	Cutime    float64 // Amount of time that this process's waited-for children have been scheduled in user mode
+	Cstime    float64 // Amount of time that this process's waited-for children have been scheduled in kernel mode
 	Rss       int     // Resident Set Size: number of pages the process has in real memory
 	Starttime float64 // The time the process started after system boot
 

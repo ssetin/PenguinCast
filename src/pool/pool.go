@@ -9,12 +9,16 @@ import (
 )
 
 // Manager ...
-type Manager struct {
+type manager struct {
 	pages map[int]*sync.Pool
 }
 
+func NewPoolManager() *manager {
+	return &manager{}
+}
+
 // Init ...
-func (p *Manager) Init(size int) *sync.Pool {
+func (p *manager) Init(size int) *sync.Pool {
 
 	if p.pages == nil {
 		p.pages = make(map[int]*sync.Pool)
@@ -34,7 +38,7 @@ func (p *Manager) Init(size int) *sync.Pool {
 }
 
 // GetPool ...
-func (p *Manager) GetPool(size int) (*sync.Pool, error) {
+func (p *manager) GetPool(size int) (*sync.Pool, error) {
 	if pool, ok := p.pages[size]; ok {
 		return pool, nil
 	}
