@@ -5,10 +5,12 @@ package ice
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,10 +25,6 @@ import (
 const (
 	cServerName = "PenguinCast"
 	cVersion    = "0.3.0"
-)
-
-var (
-	vCommands = [...]string{"metadata"}
 )
 
 type Server struct {
@@ -94,13 +92,16 @@ func (i *Server) configureRouter() *mux.Router {
 	for _, mnt := range i.Options.Mounts {
 		r.HandleFunc("/"+mnt.Name, mnt.write).Methods("SOURCE", "PUT")
 		r.HandleFunc("/"+mnt.Name, mnt.read).Methods("GET")
+		// TODO: tutu
+		r.HandleFunc("/mode=updinfo&mount="+mnt.Name, mnt.metaDataHandler).Methods("GET")
 	}
 
 	r.HandleFunc("/info", i.infoHandler).Methods("GET")
 	r.HandleFunc("/info.json", i.jsonHandler).Methods("GET")
 	r.HandleFunc("/monitor", i.monitorHandler).Methods("GET")
-
-	r.HandleFunc("/mode=updinfo", i.metaDataHandler).Methods("GET")
+	if i.Options.Logging.UseMonitor {
+		r.HandleFunc("/updateMonitor", i.updateMonitorHandler)
+	}
 
 	r.PathPrefix("/").Handler(NewFsHook(i.Options.Paths.Web))
 
@@ -171,6 +172,30 @@ func (i *Server) Close() {
 	i.logger.Close()
 }
 
+//223.33.152.54 - - [27/Feb/2012:13:37:21 +0300] "GET /gop_aac HTTP/1.1" 200 75638 "-" "WMPlayer/10.0.0.364 guid/3300AD50-2C39-46C0-AE0A-AC7B8159E203" 400
+func (i *Server) writeAccessLog(host string, startTime time.Time, request string, bytesSend int, refer, userAgent string, seconds int) {
+	i.logger.Access("%s - - [%s] \"%s\" %s %d \"%s\" \"%s\" %d\r\n", host, startTime.Format(time.RFC1123Z), request, "200", bytesSend, refer, userAgent, seconds)
+}
+
+func (i *Server) getHost(addr string) string {
+	idx := strings.Index(addr, ":")
+	if idx == -1 {
+		return addr
+	}
+	return addr[:idx]
+}
+
+func (i *Server) logHeaders(r *http.Request) {
+	request := r.Method + " " + r.RequestURI + " " + r.Proto + "\n"
+	for name, headers := range r.Header {
+		name = strings.ToLower(name)
+		for _, h := range headers {
+			request += fmt.Sprintf("%v: %v\n", name, h)
+		}
+	}
+	i.logger.Error("\n" + request)
+}
+
 /*Start - start listening port ...*/
 func (i *Server) Start() {
 	if atomic.LoadInt32(&i.Started) == 1 {
@@ -180,22 +205,12 @@ func (i *Server) Start() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, os.Kill)
 
-	if i.Options.Logging.UseMonitor {
-		http.HandleFunc("/updateMonitor", func(w http.ResponseWriter, r *http.Request) {
-			ws, err := upGrader.Upgrade(w, r, nil)
-			if err != nil {
-				panic(err)
-			}
-			go i.sendMonitorInfo(i.Options.Logging.MonitorInterval, ws)
-		})
-	}
-
 	go func() {
 		i.mux.Lock()
 		i.StartedTime = time.Now()
 		i.mux.Unlock()
 		atomic.StoreInt32(&i.Started, 1)
-		i.logger.Log("Started on " + i.srv.Addr)
+		i.logger.Log("Started on %s,", i.srv.Addr)
 
 		if err := i.srv.ListenAndServe(); err != http.ErrServerClosed {
 			panic(err)

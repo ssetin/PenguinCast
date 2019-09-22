@@ -35,9 +35,9 @@ func NewLogger(level LogsLevel, logsPath string) (*iceLogger, error) {
 		level: level,
 	}
 
-	errorFileName := logsPath + "/error.log"
-	accessFileName := logsPath + "/access.log"
-	statFileName := logsPath + "/stat.log"
+	errorFileName := logsPath + "error.log"
+	accessFileName := logsPath + "access.log"
+	statFileName := logsPath + "stat.log"
 
 	var err error
 	newLogger.logErrorFile, err = os.OpenFile(errorFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -84,19 +84,19 @@ func (l *iceLogger) output(errorLevel LogsLevel, format string, v ...interface{}
 }
 
 func (l *iceLogger) Error(format string, v ...interface{}) {
-	l.output(levelError, format, v)
+	l.output(levelError, format, v...)
 }
 
 func (l *iceLogger) Debug(format string, v ...interface{}) {
-	l.output(levelDebug, format, v)
+	l.output(levelDebug, format, v...)
 }
 
 func (l *iceLogger) Warning(format string, v ...interface{}) {
-	l.output(levelWarning, format, v)
+	l.output(levelWarning, format, v...)
 }
 
 func (l *iceLogger) Info(format string, v ...interface{}) {
-	l.output(levelInfo, format, v)
+	l.output(levelInfo, format, v...)
 }
 
 func (l *iceLogger) Access(format string, v ...interface{}) {

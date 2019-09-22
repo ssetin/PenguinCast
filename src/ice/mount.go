@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -109,11 +110,13 @@ func (m *mount) Clear() {
 
 func (m *mount) incListeners() {
 	atomic.AddInt32(&m.State.Listeners, 1)
+	m.server.incListeners()
 }
 
 func (m *mount) decListeners() {
 	if atomic.LoadInt32(&m.State.Listeners) > 0 {
 		atomic.AddInt32(&m.State.Listeners, -1)
+		m.server.decListeners()
 	}
 }
 
@@ -125,34 +128,34 @@ func (m *mount) auth(w http.ResponseWriter, r *http.Request) error {
 	strAuth := r.Header.Get("authorization")
 
 	if strAuth == "" {
-		m.saySourceHello(w, r)
+		m.saySourceHello(w)
 		return errors.New("no authorization field")
 	}
 
 	s := strings.SplitN(strAuth, " ", 2)
 	if len(s) != 2 {
-		http.Error(w, "Not authorized", 401)
+		http.Error(w, "Not authorized", http.StatusUnauthorized)
 		return errors.New("not authorized")
 	}
 
 	b, err := base64.StdEncoding.DecodeString(s[1])
 	if err != nil {
-		http.Error(w, err.Error(), 401)
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return err
 	}
 
 	pair := strings.SplitN(string(b), ":", 2)
 	if len(pair) != 2 {
-		http.Error(w, "Not authorized", 401)
+		http.Error(w, "Not authorized", http.StatusUnauthorized)
 		return errors.New("not authorized")
 	}
 
 	if m.Password != pair[1] && m.User != pair[0] {
-		http.Error(w, "Not authorized", 401)
+		http.Error(w, "Not authorized", http.StatusUnauthorized)
 		return errors.New("wrong user or password")
 	}
 
-	m.saySourceHello(w, r)
+	m.saySourceHello(w)
 
 	return nil
 }
@@ -200,7 +203,7 @@ func (m *mount) sayHello(w *bufio.ReadWriter, icyMeta bool) {
 	w.Flush()
 }
 
-func (m *mount) saySourceHello(w http.ResponseWriter, r *http.Request) {
+func (m *mount) saySourceHello(w http.ResponseWriter) {
 	w.Header().Set("Server", m.server.serverName+"/"+m.server.version)
 	w.Header().Set("Connection", "Keep-Alive")
 	w.Header().Set("Allow", "GET, SOURCE")
@@ -214,7 +217,7 @@ func (m *mount) saySourceHello(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 }
 
-func (m *mount) writeICEHeaders(w http.ResponseWriter, r *http.Request) {
+func (m *mount) writeICEHeaders(r *http.Request) {
 	var bitRateStr string
 	bitRateStr = r.Header.Get("ice-bitrate")
 	if bitRateStr == "" {
@@ -313,6 +316,12 @@ func (m *mount) getIcyMeta() ([]byte, int) {
 	Authenticate SOURCE and write stream from it to appropriate mount buffer
 */
 func (m *mount) write(w http.ResponseWriter, r *http.Request) {
+	if !m.server.checkSources() {
+		m.logger.Error("Number of sources exceeded")
+		http.Error(w, "Number of sources exceeded", 403)
+		return
+	}
+
 	if !m.State.Started {
 		m.mux.Lock()
 		err := m.auth(w, r)
@@ -321,7 +330,7 @@ func (m *mount) write(w http.ResponseWriter, r *http.Request) {
 			m.logger.Error(err.Error())
 			return
 		}
-		m.writeICEHeaders(w, r)
+		m.writeICEHeaders(r)
 		m.State.Started = true
 		m.State.StartedTime = time.Now()
 		m.mux.Unlock()
@@ -337,7 +346,7 @@ func (m *mount) write(w http.ResponseWriter, r *http.Request) {
 	var err error
 	start := time.Now()
 
-	m.logger.Info("writeMount " + m.Name)
+	m.logger.Info("writeMount %s", m.Name)
 	defer m.close(true, &bytesSent, start, r)
 
 	hj, ok := w.(http.Hijacker)
@@ -401,6 +410,14 @@ func (m *mount) write(w http.ResponseWriter, r *http.Request) {
 */
 func (m *mount) read(w http.ResponseWriter, r *http.Request) {
 	var icyMeta bool
+	if !m.server.checkListeners() {
+		m.logger.Error("Number of listeners exceeded")
+		http.Error(w, "Number of listeners exceeded", 403)
+		return
+	}
+	if r.Header.Get("icy-metadata") == "1" {
+		icyMeta = true
+	}
 
 	var meta []byte
 	var err error
@@ -436,7 +453,7 @@ func (m *mount) read(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	m.logger.Debug("readMount " + m.Name)
+	m.logger.Debug("readMount %s", m.Name)
 	defer m.close(false, &bytesSent, start, r)
 
 	//try to maximize unused buffer pages from beginning
@@ -448,8 +465,6 @@ func (m *mount) read(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m.sayHello(bufRW, icyMeta)
-
-	m.server.incListeners()
 	m.incListeners()
 
 OuterLoop:
@@ -542,6 +557,11 @@ OuterLoop:
 	}
 }
 
+func (m *mount) metaDataHandler(w http.ResponseWriter, r *http.Request) {
+	m.logger.Log("meta %s %s", path.Base(r.URL.Query().Get("mount")), r.URL.RawQuery)
+	m.updateMeta(w, r)
+}
+
 func (m *mount) closeAndUnlock(pack *bufElement, err error) {
 	if te, ok := err.(net.Error); ok && te.Timeout() {
 		log.Println("Write timeout " + te.Error())
@@ -558,7 +578,6 @@ func (m *mount) close(isSource bool, bytesSend *int, start time.Time, r *http.Re
 		m.Clear()
 	} else {
 		m.decListeners()
-		m.server.decListeners()
 	}
 	t := time.Now()
 	elapsed := t.Sub(start)

@@ -1,3 +1,6 @@
+// Copyright 2019 Setin Sergei
+// Licensed under the Apache License, Version 2.0 (the "License")
+
 package ice
 
 import (
@@ -23,12 +26,14 @@ type hookedResponseWriter struct {
 }
 
 func (hrw *hookedResponseWriter) WriteHeader(status int) {
-	hrw.Header().Set("Content-Type", "text/html")
-	hrw.ResponseWriter.WriteHeader(status)
 	if status == http.StatusNotFound {
-		hrw.ignore = true
+		hrw.Header().Set("Content-Type", "text/html")
+		hrw.ResponseWriter.WriteHeader(status)
 		go404(hrw.basePath, hrw)
+		hrw.ignore = true
+		return
 	}
+	hrw.ResponseWriter.WriteHeader(status)
 }
 
 func (hrw *hookedResponseWriter) Write(p []byte) (int, error) {

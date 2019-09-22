@@ -7,7 +7,6 @@ import (
 	"html/template"
 	"io/ioutil"
 	"net/http"
-	"path"
 )
 
 func (i *Server) internalHandler(w http.ResponseWriter, r *http.Request) {
@@ -28,6 +27,14 @@ func (i *Server) monitorHandler(w http.ResponseWriter, r *http.Request) {
 	i.renderPage(w, r, "templates/monitor.gohtml")
 }
 
+func (i *Server) updateMonitorHandler(w http.ResponseWriter, r *http.Request) {
+	ws, err := upGrader.Upgrade(w, r, nil)
+	if err != nil {
+		panic(err)
+	}
+	go i.sendMonitorInfo(i.Options.Logging.MonitorInterval, ws)
+}
+
 func (i *Server) renderPage(w http.ResponseWriter, r *http.Request, tplName string) {
 	t, err := template.ParseFiles(tplName)
 	if err != nil {
@@ -41,17 +48,4 @@ func (i *Server) renderPage(w http.ResponseWriter, r *http.Request, tplName stri
 		i.internalHandler(w, r)
 		return
 	}
-}
-
-func (i *Server) metaDataHandler(w http.ResponseWriter, r *http.Request) {
-
-	i.logger.Log("meta %s", r.URL.RawQuery)
-
-	mountName := path.Base(r.URL.Query().Get("mount"))
-	i.logger.Debug("runCommand 0 with %s", mountName)
-	mIdx := 0
-	if mIdx >= 0 {
-		i.Options.Mounts[mIdx].updateMeta(w, r)
-	}
-
 }
