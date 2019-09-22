@@ -8,8 +8,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"log"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"regexp"
@@ -51,9 +54,8 @@ type mount struct {
 	ContentType string
 	StreamURL   string
 
-	defaultStreamUrl string
-	serverName       string
-	serverVersion    string
+	server *Server
+	logger Logger
 
 	State struct {
 		Started     bool
@@ -68,12 +70,11 @@ type mount struct {
 }
 
 //Init ...
-func (m *mount) Init(serverName, serverVersion, host string, port int, poolManager PoolManager) error {
-	m.defaultStreamUrl = fmt.Sprintf("http://%s:%d/%s", host, port, m.Name)
-	m.Clear()
+func (m *mount) Init(srv *Server, logger Logger, poolManager PoolManager) error {
 	m.State.MetaInfo.MetaInt = m.BitRate * 1024 / 8 * 10
-	m.serverName = serverName
-	m.serverVersion = serverVersion
+	m.server = srv
+	m.logger = logger
+	m.Clear()
 
 	if m.DumpFile > "" {
 		var err error
@@ -103,7 +104,7 @@ func (m *mount) Clear() {
 	m.State.StartedTime = time.Time{}
 	m.zeroListeners()
 	m.State.MetaInfo.StreamTitle = ""
-	m.StreamURL = m.defaultStreamUrl
+	m.StreamURL = fmt.Sprintf("http://%s:%d/%s", m.server.Options.Host, m.server.Options.Socket.Port, m.Name)
 }
 
 func (m *mount) incListeners() {
@@ -171,9 +172,9 @@ func (m *mount) getParams(paramStr string) map[string]string {
 func (m *mount) sayHello(w *bufio.ReadWriter, icyMeta bool) {
 	_, _ = w.WriteString("HTTP/1.0 200 OK\r\n")
 	_, _ = w.WriteString("Server: ")
-	_, _ = w.WriteString(m.serverName)
+	_, _ = w.WriteString(m.server.serverName)
 	_, _ = w.WriteString(" ")
-	_, _ = w.WriteString(m.serverVersion)
+	_, _ = w.WriteString(m.server.version)
 	_, _ = w.WriteString("\r\n")
 	_, _ = w.WriteString("Content-Type: ")
 	_, _ = w.WriteString(m.ContentType)
@@ -200,7 +201,7 @@ func (m *mount) sayHello(w *bufio.ReadWriter, icyMeta bool) {
 }
 
 func (m *mount) saySourceHello(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Server", m.serverName+"/"+m.serverVersion)
+	w.Header().Set("Server", m.server.serverName+"/"+m.server.version)
 	w.Header().Set("Connection", "Keep-Alive")
 	w.Header().Set("Allow", "GET, SOURCE")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -305,4 +306,261 @@ func (m *mount) getIcyMeta() ([]byte, int) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	return m.State.MetaInfo.meta, m.State.MetaInfo.metaSizeByte
+}
+
+/*
+	write
+	Authenticate SOURCE and write stream from it to appropriate mount buffer
+*/
+func (m *mount) write(w http.ResponseWriter, r *http.Request) {
+	if !m.State.Started {
+		m.mux.Lock()
+		err := m.auth(w, r)
+		if err != nil {
+			m.mux.Unlock()
+			m.logger.Error(err.Error())
+			return
+		}
+		m.writeICEHeaders(w, r)
+		m.State.Started = true
+		m.State.StartedTime = time.Now()
+		m.mux.Unlock()
+	} else {
+		m.logger.Error("SOURCE already connected")
+		http.Error(w, "SOURCE already connected", 403)
+		return
+	}
+
+	bytesSent := 0
+	idle := 0
+	read := 0
+	var err error
+	start := time.Now()
+
+	m.logger.Info("writeMount " + m.Name)
+	defer m.close(true, &bytesSent, start, r)
+
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		m.logger.Error("webServer doesn't support hijacking")
+		http.Error(w, "webServer doesn't support hijacking", http.StatusInternalServerError)
+		return
+	}
+
+	conn, _, err := hj.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer conn.Close()
+
+	bufRW := bufio.NewReaderSize(conn, 1024*m.BitRate/8)
+
+	m.server.incSources()
+	// max bytes per second according to bitrate
+	buff := make([]byte, m.BitRate*1024/8)
+
+	for {
+		//check, if server has to be stopped
+		if atomic.LoadInt32(&m.server.Started) == 0 {
+			break
+		}
+
+		read, err = bufRW.Read(buff)
+		if err != nil {
+			if err == io.EOF {
+				idle++
+				if idle >= m.server.Options.Limits.SourceIdleTimeOut {
+					m.logger.Error("Source idle time is reached")
+					break
+				}
+			}
+			m.logger.Error(err.Error())
+		} else {
+			idle = 0
+		}
+		// append to the buffer's queue based on actual read bytes
+		m.buffer.Append(buff, read)
+		bytesSent += read
+		m.logger.Debug("writeMount %d", read)
+
+		if m.dumpFile != nil {
+			m.dumpFile.Write(m.buffer.Last().buffer)
+		}
+
+		time.Sleep(1000 * time.Millisecond)
+
+		//check if max buffer size reached and truncate it
+		m.buffer.checkAndTruncate()
+	}
+}
+
+/*
+	read
+	Send stream from requested mount to client
+*/
+func (m *mount) read(w http.ResponseWriter, r *http.Request) {
+	var icyMeta bool
+
+	var meta []byte
+	var err error
+	var beginIteration time.Time
+	var pack, nextPack *bufElement
+
+	bytesSent := 0
+	write := 0
+	idle := 0
+	idleTimeOut := m.server.Options.Limits.EmptyBufferIdleTimeOut * 1000
+	writeTimeOut := time.Second * time.Duration(m.server.Options.Limits.WriteTimeOut)
+	offset := 0
+	noMetaBytes := 0
+	partWrite := 0
+	noMetaTmp := 0
+	delta := 0
+	metaLen := 0
+	n := 0
+
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		m.logger.Error("webServer doesn't support hijacking")
+		http.Error(w, "webServer doesn't support hijacking", http.StatusInternalServerError)
+		return
+	}
+
+	conn, bufRW, err := hj.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer conn.Close()
+
+	start := time.Now()
+
+	m.logger.Debug("readMount " + m.Name)
+	defer m.close(false, &bytesSent, start, r)
+
+	//try to maximize unused buffer pages from beginning
+	pack = m.buffer.Start(m.BurstSize)
+
+	if pack == nil {
+		m.logger.Error("readMount Empty buffer")
+		return
+	}
+
+	m.sayHello(bufRW, icyMeta)
+
+	m.server.incListeners()
+	m.incListeners()
+
+OuterLoop:
+	for {
+		beginIteration = time.Now()
+		conn.SetWriteDeadline(time.Now().Add(writeTimeOut))
+		//check, if server has to be stopped
+		if atomic.LoadInt32(&m.server.Started) == 0 {
+			break
+		}
+
+		n++
+		pack.Lock()
+		if icyMeta {
+			meta, metaLen = m.getIcyMeta()
+
+			if noMetaBytes+pack.len+delta > m.State.MetaInfo.MetaInt {
+				offset = m.State.MetaInfo.MetaInt - noMetaBytes - delta
+
+				//log.Printf("*** write block with meta ***")
+				//log.Printf("   offset = %d - %d(nometabytes) - %d (delta) = %d", mount.State.MetaInfo.MetaInt, nometabytes, delta, offset)
+
+				if offset < 0 || offset >= pack.len {
+					m.logger.Warning("Bad meta-info offset %d", offset)
+					log.Printf("!!! Bad metainfo offset %d ***", offset)
+					offset = 0
+				}
+
+				partWrite, err = bufRW.Write(pack.buffer[:offset])
+				if err != nil {
+					m.closeAndUnlock(pack, err)
+					break
+				}
+				write += partWrite
+				partWrite, err = bufRW.Write(meta)
+				if err != nil {
+					m.closeAndUnlock(pack, err)
+					break
+				}
+				write += partWrite
+				partWrite, err = bufRW.Write(pack.buffer[offset:])
+				if err != nil {
+					m.closeAndUnlock(pack, err)
+					break
+				}
+				write += partWrite
+
+				delta = write - offset - metaLen
+				noMetaBytes = 0
+				noMetaTmp = 0
+
+				//log.Printf("   delta = %d(writed) - %d(offset) - %d(metalen) = %d", writed, offset, metalen, delta)
+			} else {
+				write = 0
+				noMetaTmp, err = bufRW.Write(pack.buffer)
+				noMetaBytes += noMetaTmp
+			}
+		} else {
+			write, err = bufRW.Write(pack.buffer)
+		}
+
+		if err != nil {
+			m.closeAndUnlock(pack, err)
+			break
+		}
+
+		bytesSent += write + noMetaTmp
+
+		// send burst data without waiting
+		if bytesSent >= m.BurstSize {
+			if time.Since(beginIteration) < time.Second {
+				time.Sleep(time.Second - time.Since(beginIteration))
+			}
+		}
+
+		nextPack = pack.Next()
+		for nextPack == nil {
+			time.Sleep(time.Millisecond * 250)
+			idle += 250
+			if idle >= idleTimeOut {
+				m.closeAndUnlock(pack, errors.New("empty Buffer idle time is reached"))
+				break OuterLoop
+			}
+			nextPack = pack.Next()
+		}
+		idle = 0
+		pack.UnLock()
+
+		pack = nextPack
+	}
+}
+
+func (m *mount) closeAndUnlock(pack *bufElement, err error) {
+	if te, ok := err.(net.Error); ok && te.Timeout() {
+		log.Println("Write timeout " + te.Error())
+		m.logger.Error("Write timeout")
+	} else {
+		m.logger.Error(err.Error())
+	}
+	pack.UnLock()
+}
+
+func (m *mount) close(isSource bool, bytesSend *int, start time.Time, r *http.Request) {
+	if isSource {
+		m.server.decSources()
+		m.Clear()
+	} else {
+		m.decListeners()
+		m.server.decListeners()
+	}
+	t := time.Now()
+	elapsed := t.Sub(start)
+	m.server.writeAccessLog(m.server.getHost(r.RemoteAddr), start, r.Method+" "+r.RequestURI+" "+r.Proto, *bytesSend, r.Referer(), r.UserAgent(), int(elapsed.Seconds()))
 }

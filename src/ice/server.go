@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -52,7 +51,7 @@ type Server struct {
 	logger      Logger
 }
 
-// Init - Load params from config.json
+// Init - Load params from config.yaml
 func NewServer() (*Server, error) {
 	srv := &Server{
 		serverName:  cServerName,
@@ -90,16 +89,20 @@ func NewServer() (*Server, error) {
 
 func (i *Server) configureRouter() *mux.Router {
 	r := mux.NewRouter()
+	r.StrictSlash(true)
+
 	for _, mnt := range i.Options.Mounts {
-		r.HandleFunc("/"+mnt.Name, i.writeMount).Methods("SOURCE", "PUT")
-		r.HandleFunc("/"+mnt.Name, i.readMount).Methods("GET")
+		r.HandleFunc("/"+mnt.Name, mnt.write).Methods("SOURCE", "PUT")
+		r.HandleFunc("/"+mnt.Name, mnt.read).Methods("GET")
 	}
 
-	r.HandleFunc("/info", i.infoPage).Methods("GET")
-	r.HandleFunc("/info.json", i.jsonPage).Methods("GET")
-	r.HandleFunc("/monitor", i.monitorPage).Methods("GET")
-	r.NotFoundHandler = http.HandlerFunc(i.notFoundPage)
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir(i.Options.Paths.Web)))
+	r.HandleFunc("/info", i.infoHandler).Methods("GET")
+	r.HandleFunc("/info.json", i.jsonHandler).Methods("GET")
+	r.HandleFunc("/monitor", i.monitorHandler).Methods("GET")
+
+	r.HandleFunc("/mode=updinfo", i.metaDataHandler).Methods("GET")
+
+	r.PathPrefix("/").Handler(NewFsHook(i.Options.Paths.Web))
 
 	return r
 }
@@ -107,7 +110,7 @@ func (i *Server) configureRouter() *mux.Router {
 func (i *Server) initMounts() error {
 	var err error
 	for idx := range i.Options.Mounts {
-		err = i.Options.Mounts[idx].Init(i.serverName, i.version, i.Options.Host, i.Options.Socket.Port, i.poolManager)
+		err = i.Options.Mounts[idx].Init(i, i.logger, i.poolManager)
 		if err != nil {
 			return err
 		}
@@ -168,77 +171,6 @@ func (i *Server) Close() {
 	i.logger.Close()
 }
 
-func (i *Server) checkIsMount(page string) int {
-	for idx := range i.Options.Mounts {
-		if i.Options.Mounts[idx].Name == page {
-			return idx
-		}
-	}
-	return -1
-}
-
-func (i *Server) getMount(mountName string) *mount {
-	for idx := range i.Options.Mounts {
-		if i.Options.Mounts[idx].Name == mountName {
-			return &i.Options.Mounts[idx]
-		}
-	}
-	return nil
-}
-
-func (i *Server) checkIsCommand(page string, r *http.Request) int {
-	for idx := range vCommands {
-		if vCommands[idx] == page && r.URL.Query().Get("mode") == "updinfo" {
-			return idx
-		}
-	}
-	return -1
-}
-
-// handler general http handler
-/*func (i *Server) handler(w http.ResponseWriter, r *http.Request) {
-	if i.Options.Logging.LogLevel == 4 {
-		i.logHeaders(w, r)
-	}
-
-	page, mountIdx, cmdIdx, err := i.checkPage(w, r)
-	if err != nil {
-		i.logger.Error(err.Error())
-		return
-	}
-
-	if mountIdx >= 0 {
-		i.openMount(mountIdx, w, r)
-		return
-	}
-
-	if cmdIdx >= 0 {
-		i.runCommand(cmdIdx, w, r)
-		return
-	}
-
-	if strings.HasSuffix(page, "info.html") || strings.HasSuffix(page, "info.json") || strings.HasSuffix(page, "monitor.html") {
-		i.renderPage(w, r, page)
-	} else {
-		http.ServeFile(w, r, page)
-	}
-}*/
-
-/*
-	runCommand
-*/
-func (i *Server) runCommand(idx int, w http.ResponseWriter, r *http.Request) {
-	if idx == 0 {
-		mountName := path.Base(r.URL.Query().Get("mount"))
-		i.logger.Debug("runCommand 0 with %s", mountName)
-		mIdx := i.checkIsMount(mountName)
-		if mIdx >= 0 {
-			i.Options.Mounts[mIdx].updateMeta(w, r)
-		}
-	}
-
-}
-
 /*Start - start listening port ...*/
 func (i *Server) Start() {
 	if atomic.LoadInt32(&i.Started) == 1 {
@@ -258,8 +190,6 @@ func (i *Server) Start() {
 		})
 	}
 
-	//http.HandleFunc("/", i.handler)
-
 	go func() {
 		i.mux.Lock()
 		i.StartedTime = time.Now()
@@ -270,7 +200,6 @@ func (i *Server) Start() {
 		if err := i.srv.ListenAndServe(); err != http.ErrServerClosed {
 			panic(err)
 		}
-
 	}()
 
 	<-stop

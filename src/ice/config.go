@@ -45,7 +45,7 @@ type options struct {
 		StatInterval    int           `yaml:"StatInterval"`
 	} `yaml:"Logging"`
 
-	Mounts []mount `yaml:"Mounts"`
+	Mounts []*mount `yaml:"Mounts"`
 }
 
 func (o *options) Load() error {
