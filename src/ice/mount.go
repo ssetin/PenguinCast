@@ -15,7 +15,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -173,7 +172,7 @@ func (m *mount) getParams(paramStr string) map[string]string {
 }
 
 func (m *mount) sayHello(w *bufio.ReadWriter, icyMeta bool) {
-	_, _ = w.WriteString("HTTP/1.0 200 OK\r\n")
+	_, _ = w.WriteString("HTTP/1.1 200 OK\r\n")
 	_, _ = w.WriteString("Server: ")
 	_, _ = w.WriteString(m.server.serverName)
 	_, _ = w.WriteString(" ")
@@ -240,9 +239,8 @@ func (m *mount) writeICEHeaders(r *http.Request) {
 	m.Description = r.Header.Get("ice-description")
 }
 
-func (m *mount) updateMeta(w http.ResponseWriter, r *http.Request) {
-	err := m.auth(w, r)
-	if err != nil {
+func (m *mount) meta(w http.ResponseWriter, r *http.Request) {
+	if m.auth(w, r) != nil {
 		return
 	}
 
@@ -555,11 +553,6 @@ OuterLoop:
 
 		pack = nextPack
 	}
-}
-
-func (m *mount) metaDataHandler(w http.ResponseWriter, r *http.Request) {
-	m.logger.Log("meta %s %s", path.Base(r.URL.Query().Get("mount")), r.URL.RawQuery)
-	m.updateMeta(w, r)
 }
 
 func (m *mount) closeAndUnlock(pack *bufElement, err error) {

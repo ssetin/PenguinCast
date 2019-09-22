@@ -35,7 +35,7 @@ Mounts:
     Description: Rock radio station, Saint Petersburg
     BitRate: 96
     BurstSize: 65535
-    DumpFile: ''
+    DumpFile:
 
   - Name: JazzMe
     User: admin
@@ -44,4 +44,4 @@ Mounts:
     Description: Indie jazz radio station, Online cast
     BitRate: 128
     BurstSize: 65535
-    DumpFile: ''
+    DumpFile:
