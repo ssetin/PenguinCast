@@ -10,8 +10,8 @@ IceCast compatible streaming audio server - server part of your internet radio s
 * Receiving stream from Source and sending it to Clients
 * Operating with ShoutCast metadata
 * Collecting and saving listening statistics to access.log file
-* Html and json endpoints for accessing server status (__http://host:port/info.html__ and __http://host:port/info.json__)
-* Real time server state monitoring (__http://host:port/monitor.html__)
+* Html and json endpoints for accessing server status (__http://host:port/info__ and __http://host:port/info.json__)
+* Real time server state monitoring (__http://host:port/monitor__)
 * Configuring by YAML
 
 ## Configuring
@@ -55,7 +55,7 @@ Mounts:
     Description: Rock radio station, Saint Petersburg
     BitRate: 96
     BurstSize: 65535
-    DumpFile: ''
+    DumpFile: 
 ```
 
 #### Socket

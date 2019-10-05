@@ -228,9 +228,7 @@ func (m *mount) writeICEHeaders(r *http.Request) {
 	}
 
 	bRate, err := strconv.Atoi(bitRateStr)
-	if err != nil {
-		m.BitRate = 0
-	} else {
+	if err == nil {
 		m.BitRate = bRate
 	}
 

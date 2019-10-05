@@ -23,7 +23,7 @@ import (
 
 const (
 	cServerName = "PenguinCast"
-	cVersion    = "0.3.0"
+	cVersion    = "0.3.0dev"
 )
 
 type Server struct {
@@ -197,7 +197,7 @@ func (i *Server) Start() {
 		i.StartedTime = time.Now()
 		i.mux.Unlock()
 		atomic.StoreInt32(&i.Started, 1)
-		i.logger.Log("Started on %s,", i.srv.Addr)
+		i.logger.Log("Started on %s", i.srv.Addr)
 
 		if err := i.srv.ListenAndServe(); err != http.ErrServerClosed {
 			panic(err)
